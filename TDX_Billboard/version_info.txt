@@ -1,0 +1,19 @@
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 0, 13, 0),
+    prodvers=(1, 0, 13, 0),
+    mask=0x3f, flags=0x0, OS=0x4, fileType=0x1, subtype=0x0, date=(0,0),
+  ),
+  kids=[
+    StringFileInfo([StringTable(u'040404b0', [
+      StringStruct(u'CompanyName',      u'KVH'),
+      StringStruct(u'FileDescription',  u'TDX 台鐵時刻表'),
+      StringStruct(u'FileVersion',      u'1.0.13.0'),
+      StringStruct(u'InternalName',     u'TDX 台鐵時刻表'),
+      StringStruct(u'LegalCopyright',   u'\u00a9 2026 KVH'),
+      StringStruct(u'OriginalFilename', u'TDX 台鐵時刻表.exe'),
+      StringStruct(u'ProductName',      u'TDX 台鐵時刻表'),
+      StringStruct(u'ProductVersion',   u'1.0.13.0'),
+    ])])
+  , VarFileInfo([VarStruct(u'Translation', [0x0404, 0x04b0])])]
+)
