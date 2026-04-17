@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoID — 自動打卡</title>
+<style>
+  :root {
+    --bg:       #1e1e1e;
+    --bg2:      #252525;
+    --bg3:      #2b2b2b;
+    --panel:    #2d2d2d;
+    --border:   #3a3a3a;
+    --fg:       #d4d4d4;
+    --cyan:     #56d1ff;
+    --gold:     #f0c040;
+    --green:    #27ae60;
+    --red:      #c0392b;
+    --blue:     #1e6fb5;
+    --th-bg:    #1a3a4a;
+    --code-bg:  #1a1a1a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft JhengHei", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.7;
+    padding: 0 0 60px;
+  }
+
+  /* ── header ── */
+  header {
+    background: linear-gradient(135deg, #0d2a3a 0%, #1a1a2e 100%);
+    border-bottom: 2px solid var(--cyan);
+    padding: 40px 48px 32px;
+  }
+  header h1 { font-size: 2rem; color: var(--cyan); letter-spacing: .04em; }
+  header p  { margin-top: 8px; color: #aaa; max-width: 680px; }
+
+  /* ── nav ── */
+  nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 48px;
+    display: flex; flex-wrap: wrap; gap: 0;
+  }
+  nav a {
+    display: inline-block;
+    padding: 12px 16px;
+    color: #aaa;
+    text-decoration: none;
+    font-size: .85rem;
+    border-bottom: 2px solid transparent;
+    transition: color .2s, border-color .2s;
+  }
+  nav a:hover { color: var(--cyan); border-color: var(--cyan); }
+
+  /* ── layout ── */
+  main { max-width: 960px; margin: 0 auto; padding: 40px 48px; }
+  section { margin-bottom: 52px; }
+  h2 {
+    font-size: 1.35rem;
+    color: var(--cyan);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+    scroll-margin-top: 16px;
+  }
+  h3 { font-size: 1.05rem; color: var(--gold); margin: 24px 0 10px; }
+  p  { margin-bottom: 12px; }
+
+  /* ── tables ── */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: .9rem; }
+  thead th {
+    background: var(--th-bg);
+    color: var(--cyan);
+    text-align: left;
+    padding: 9px 14px;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:nth-child(even) { background: var(--bg2); }
+  td, th { padding: 8px 14px; vertical-align: top; }
+  td:first-child { white-space: nowrap; }
+
+  /* ── code / pre ── */
+  code {
+    background: var(--code-bg);
+    color: var(--cyan);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: .88em;
+    font-family: "Cascadia Code", "Consolas", monospace;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    padding: 18px 20px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: .85rem;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    color: #c8c8c8;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+  pre .c  { color: #6a9955; }
+  pre .k  { color: #569cd6; }
+  pre .s  { color: var(--gold); }
+  pre .n  { color: var(--cyan); }
+
+  /* ── badges ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .badge-blue  { background: #1e3a5f; color: var(--cyan); }
+  .badge-green { background: #1a3d28; color: #4caf7d; }
+  .badge-gold  { background: #3d2f00; color: var(--gold); }
+  .badge-red   { background: #3d1010; color: #e07070; }
+
+  /* ── alert box ── */
+  .alert {
+    border-left: 3px solid var(--gold);
+    background: #2a2300;
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: .9rem;
+    margin-bottom: 16px;
+    color: #d4b84a;
+  }
+
+  /* ── UI mockup ── */
+  .mockup {
+    background: #2b2b2b;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 24px 28px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: .82rem;
+    line-height: 1.8;
+    max-width: 460px;
+  }
+  .mockup .clk  { color: var(--cyan);  font-size: 1.6rem; font-weight: 700; }
+  .mockup .sess { color: var(--green); }
+  .mockup .next { color: var(--gold); }
+  .mockup .btn-exec   { background: var(--blue);  color: #fff; padding: 2px 12px; border-radius: 3px; }
+  .mockup .btn-cancel { background: #6b3030; color: #aaa; padding: 2px 12px; border-radius: 3px; }
+  .mockup .btn-lock   { background: #7a5500; color: var(--gold); padding: 2px 10px; border-radius: 3px; }
+  .mockup .btn-auth   { background: #3a3a3a; color: var(--fg); padding: 2px 12px; border-radius: 3px; }
+  .mockup .btn-on     { background: var(--green); color: #fff; padding: 1px 10px; border-radius: 3px; }
+  .mockup .dim { color: #555; }
+  .mockup .grp { color: #aaf; }
+
+  footer {
+    text-align: center;
+    font-size: .78rem;
+    color: #555;
+    margin-top: 60px;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AutoID &mdash; 自動打卡</h1>
+  <p>適用於 CMS 的自動出勤工具。透過 Playwright 開啟 Google Chrome，
+     載入已儲存的 30 天 Session，並在排定時間以隨機延遲點擊
+     <strong>線上打卡</strong>。</p>
+  <div style="margin-top:14px">
+    <span class="badge badge-blue">Python 3.10+</span>
+    <span class="badge badge-blue">tkinter</span>
+    <span class="badge badge-blue">Playwright</span>
+    <span class="badge badge-gold">v1.0.1</span>
+    <span class="badge badge-green">RunTime</span>
+  </div>
+</header>
+
+<nav>
+  <a href="#brief">基本資訊</a>
+  <a href="#firstrun">首次執行</a>
+  <a href="#userenv">user.env</a>
+  <a href="#overview">介面總覽</a>
+  <a href="#algorithm">演算法</a>
+  <a href="#flowcharts">流程圖</a>
+  <a href="#behaviour">排程行為</a>
+  <a href="#alerts">Email 通知</a>
+  <a href="#issues">已知問題</a>
+  <a href="#files">檔案說明</a>
+</nav>
+
+<main>
+
+<!-- ───────────────────────── 基本資訊 ───────────────────────── -->
+<section id="brief">
+  <h2>基本資訊</h2>
+  <table>
+    <thead><tr><th>項目</th><th>說明</th></tr></thead>
+    <tbody>
+      <tr><td>應用名稱</td><td>RunTime &nbsp;<code>_APP_NAME</code></td></tr>
+      <tr><td>版本</td><td>1.0.1</td></tr>
+      <tr><td>設定檔</td><td><code>user.env</code>（CMS 網址、帳號密碼、SMTP、Session 選擇器）</td></tr>
+      <tr><td>語言</td><td>Python 3.10+</td></tr>
+      <tr><td>介面框架</td><td>tkinter &mdash; 深色主題，固定視窗大小</td></tr>
+      <tr><td>瀏覽器引擎</td><td>Playwright &rarr; Google Chrome（<code>channel="chrome"</code>）</td></tr>
+      <tr><td>Session 壽命</td><td>30 天（CMS「記住我」）</td></tr>
+      <tr><td>排程檔</td><td><code>autoid_schedule.json</code></td></tr>
+      <tr><td>選項檔</td><td><code>autoid_options.json</code></td></tr>
+      <tr><td>Session 檔</td><td><code>autoid_session.json</code> + <code>autoid_session_ts.txt</code></td></tr>
+      <tr><td>記錄檔</td><td><code>log.log</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ───────────────────────── 首次執行 ───────────────────────── -->
+<section id="firstrun">
+  <h2>首次執行</h2>
+  <p>首次啟動（找不到 <code>user.env</code>）時，會自動開啟設定精靈，收集以下資訊：</p>
+  <table>
+    <thead><tr><th>欄位</th><th>說明</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CMS 網址</strong></td><td>例如 <code>https://cms.company.com/cms</code></td></tr>
+      <tr><td><strong>帳號</strong></td><td>登入 Email</td></tr>
+      <tr><td><strong>密碼</strong></td><td>登入密碼</td></tr>
+      <tr><td><strong>過期選擇器</strong></td><td>登入頁可見的 CSS 選擇器（預設 <code>#email</code>）</td></tr>
+      <tr><td><strong>有效選擇器</strong></td><td>儀表板上打卡按鈕的文字（預設 <code>線上打卡</code>）</td></tr>
+      <tr><td><strong>SMTP 設定</strong></td><td>選填 &mdash; 留空則停用 Email 通知</td></tr>
+      <tr><td><strong>通知收件人</strong></td><td>最多 5 個 Email，以逗號分隔</td></tr>
+    </tbody>
+  </table>
+  <p>精靈會在程式同目錄下建立 <code>user.env</code>。之後可直接編輯 <code>user.env</code> 修改任何欄位。</p>
+</section>
+
+<!-- ───────────────────────── USER.ENV ───────────────────────── -->
+<section id="userenv">
+  <h2>user.env 設定說明</h2>
+  <pre><span class="c"># 必填</span>
+CMS_URL=https://cms.company.com/cms
+EMAIL=user@company.com
+PASSWORD=your-password
+
+<span class="c"># Session 選擇器（如非此 CMS 請依需求修改）</span>
+SESSION_EXPIRED_SEL=#email
+SESSION_VALID_SEL=線上打卡
+
+<span class="c"># SMTP Email 通知（選填 — 留空則停用）</span>
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=sender@gmail.com
+SMTP_PASS=app-password
+NOTIFY_TO=you@example.com, colleague@example.com</pre>
+  <div class="alert">⚠ <code>SESSION_EXPIRED_SEL</code> 必須是有效的 CSS 選擇器（如 <code>#email</code>）。<strong>請勿</strong>填入 Email 地址。</div>
+</section>
+
+<!-- ───────────────────────── 介面總覽 ───────────────────────── -->
+<section id="overview">
+  <h2>介面總覽</h2>
+
+  <div class="mockup">
+    <div class="clk">11:03</div>
+    <div class="sess">Session 於 30 天後到期 &nbsp;(2026-05-10)</div>
+    <div class="next">🔒 下次觸發：Fri 08:06 &nbsp;(21 小時後)</div>
+    <br>
+    <span class="btn-exec">執行</span> &nbsp;
+    <span class="btn-cancel">取消</span> &nbsp;
+    <span class="btn-lock">🔒</span>
+    <br><br>
+    <span class="btn-auth">🔑 Auth Test</span>
+    <br><br>
+    <span class="grp">┌ 設定排程 ──────────────────────┐</span><br>
+    <span class="grp">│</span> &nbsp;時段 1：<span style="color:var(--cyan)">08</span> : <span style="color:var(--cyan)">06</span><br>
+    <span class="grp">│</span> &nbsp;時段 2：<span style="color:var(--cyan)">18</span> : <span style="color:var(--cyan)">13</span><br>
+    <span class="grp">│</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="btn-on">● ON</span><br>
+    <span class="grp">│</span> &nbsp;◀ &nbsp;2026 年 4 月 &nbsp;▶<br>
+    <span class="grp">│</span> &nbsp;<span style="color:#9b2335">日</span> 一 二 三 四 五 <span style="color:#9b2335">六</span><br>
+    <span class="grp">│</span> &nbsp;<span class="dim">...日曆格（綠/灰/紅）...</span><br>
+    <span class="grp">└────────────────────────────────┘</span><br>
+    <br>
+    <span class="btn-on" style="font-size:.8em">● ON</span> 儲存記錄至 log.log<br>
+    <span class="dim">[捲動記錄框]</span>
+  </div>
+
+  <h3>自動執行流程</h3>
+  <ol style="padding-left:1.4em; line-height:2.2">
+    <li>程式啟動 &rarr; 載入排程、選項、鎖定狀態</li>
+    <li>排程器監聽 <code>datetime.now()</code> 等待時段吻合</li>
+    <li>吻合 &rarr; 計算隨機延遲 &rarr; 開始倒數</li>
+    <li>倒數歸零 &rarr; 以 daemon 執行緒開啟 Chrome &rarr; 點擊線上打卡</li>
+    <li>瀏覽器隨機保持開啟 3&ndash;10 分鐘 &rarr; 自動關閉</li>
+    <li>排程器重新等待下一個時段</li>
+  </ol>
+</section>
+
+<!-- ───────────────────────── 演算法 ───────────────────────── -->
+<section id="algorithm">
+  <h2>演算法說明</h2>
+
+  <h3>隨機延遲 &mdash; <code>_calc_delay(opts)</code></h3>
+  <pre><span class="c"># rand_enabled = True</span>
+delay = randint(min_min, max_min) × 60  +  randint(0, 59)   <span class="c"># 秒</span>
+<span class="c"># 例：min=1, max=10  →  範圍 60 秒 … 659 秒</span>
+
+<span class="c"># rand_enabled = False</span>
+delay = randint(0, 59)   <span class="c"># 秒（⚠ 可能為 0）</span></pre>
+  <p>延遲在<strong>偵測到時段吻合的當下</strong>計算，而非提前。</p>
+
+  <h3>下次時段掃描 &mdash; <code>_next_fire_dt()</code></h3>
+  <pre>slots = [(t1h, t1m), (t2h, t2m)]
+
+for days_ahead in 0 … 7:
+    d = today + days_ahead
+    if not is_day_on(d):  <span class="k">略過</span>
+
+    for (h, m) in sorted(slots):    <span class="c"># 較早的時間優先</span>
+        dt = datetime(d.year, d.month, d.day, h, m)
+        if dt > now:  <span class="k">return</span> dt
+
+<span class="k">return</span> None   <span class="c"># 排程關閉或 8 天內無啟用日</span></pre>
+  <p><code>is_day_on(d)</code> &mdash; 優先查 <code>overrides[d.isoformat()]</code>，若無則依 <code>weekday &lt; 5</code>（週一至週五）。</p>
+
+  <h3>時段偵測 &mdash; <code>_tick_schedule()</code></h3>
+  <pre>清除早於今日的 _fired_keys
+
+if 排程啟用 AND 今日為 ON:
+    key = <span class="s">"YYYY-MM-DD HH:MM"</span>
+    if key 不在 _fired_keys:
+        for (h, m) in slots:
+            if now.hour == h AND now.minute == m:
+                _fired_keys.add(key)
+                _do_fire()
+                <span class="k">break</span>
+
+重新排程:
+    鎖定   → after(至下一個 :00 的毫秒數)   <span class="c"># 分鐘邊界對齊</span>
+    未鎖定 → after(30 000)                 <span class="c"># 每 30 秒</span></pre>
+  <p><code>_fired_keys</code> 為 <code>set[str]</code>，防止同一時段在同一分鐘內重複觸發。</p>
+
+  <h3>分鐘對齊公式</h3>
+  <pre>now = datetime.now()
+ms_next = (60 - now.second) * 1000 - now.microsecond // 1000
+after(max(ms_next, 500), callback)</pre>
+  <p><code>_tick_clock</code> 與鎖定模式的 <code>_tick_schedule</code> 共用此公式，確保時鐘顯示與排程器在整秒邊界同步。</p>
+</section>
+
+<!-- ───────────────────────── 流程圖 ───────────────────────── -->
+<section id="flowcharts">
+  <h2>流程圖</h2>
+
+  <h3>啟動流程</h3>
+  <pre>python AutoID.py
+    └─ 找不到 user.env？
+          是 → _run_setup_wizard() → 寫入 user.env
+          否 → _load_credentials() → EMAIL, PASSWORD, CMS_URL, SEL_EXPIRED, SEL_VALID
+                App.__init__()
+                      ├─ _load_sched()  → {t1h, t1m, t2h, t2m, enabled, locked, overrides}
+                      ├─ _load_opts()   → {rand_enabled, min_min, max_min, 2fa_timeout_secs …}
+                      ├─ 建立 UI 元件
+                      ├─ _tick_clock()       ───► 永久循環（分鐘對齊 UI 更新）
+                      ├─ _tick_schedule()    ───► 永久循環（排程器輪詢）
+                      └─ sched["locked"]==True ?
+                               是 → _toggle_lock()（恢復鎖定 + 停用控制項）</pre>
+
+  <h3>排程觸發鏈</h3>
+  <pre>_tick_schedule()  偵測到時段吻合
+      │
+      ▼
+_do_fire()
+      ├── delay    = _calc_delay(opts)
+      ├── exec_dt  = now + delay
+      └── _on_execute(pre_delay=delay, scheduled=True)
+                │
+                ├── 停用執行鈕   啟用取消鈕
+                ├── _exec_target_dt = now + delay
+                └── _run_countdown()  ◄──────────────────────────┐
+                          │                                       │
+                          ├── 取消？  → _reset_btns()            │
+                          ├── 剩餘 ≤ 0？ → _launch()             │
+                          └── 更新倒數標籤 → after(Δms) ─────────┘
+                                  │
+                                  ▼  (剩餘 = 0)
+                          _launch()  [daemon 執行緒]
+                                  │
+                                  ▼
+                          clock_in(log, set_cd, stop, close_secs, tfa_timeout_ms)
+                              ├── 開啟 Chrome（可見視窗）
+                              ├── 載入 autoid_session.json
+                              ├── 導向 CMS_URL
+                              ├── SEL_EXPIRED 可見？
+                              │       是 → 填入帳號 + 密碼 → 送出
+                              │             等待 SEL_CLOCKIN（tfa_timeout_secs）
+                              │               成功 → 儲存 Session
+                              │               逾時 → 雙重驗證模式：
+                              │                       寄送警示 Email
+                              │                       無限等待 SEL_CLOCKIN
+                              ├── 等待 SEL_CLOCKIN 按鈕（15 秒逾時）
+                              ├── 點擊
+                              ├── 隨機等待 close_secs（每 1 秒檢查停止旗標）
+                              └── browser.close()</pre>
+
+  <h3>鎖定切換</h3>
+  <pre>使用者點擊 🔒 / 🔓
+      │
+      ▼
+_toggle_lock()
+      ├── 翻轉 _lock_var
+      │
+      ├── 鎖定=True  → 停用：時間格、ON/OFF 鈕、日期鈕、選項選單
+      │   鎖定=False → 啟用：以上全部
+      │
+      ├── 更新按鈕外觀（顏色 + 圖示）
+      ├── 更新視窗標題（加 / 移除 🔒 前綴）
+      ├── 儲存 {"locked": bool}  →  autoid_schedule.json
+      │
+      ├── 取消目前 _poll_id
+      └── _tick_schedule()
+                鎖定   → after(至下一個 :00)   分鐘對齊
+                未鎖定 → after(30 000)          每 30 秒</pre>
+
+  <h3>Auth Test 流程</h3>
+  <pre>使用者點擊 🔑 Auth Test
+      │
+      ▼
+_test_auth()  [daemon 執行緒]
+      ├── 無頭模式啟動 Chrome
+      ├── 載入 autoid_session.json
+      ├── 導向 CMS_URL
+      ├── SEL_EXPIRED 可見？
+      │       True  → expired = True
+      │       False → expired = False
+      ├── browser.close()
+      └── _auth_done(expired)
+                None  → ⚠ 無法連線       深紅色按鈕
+                True  → ❌ Session 已過期  紅色按鈕
+                False → ✅ Session 有效    綠色按鈕
+                after(5 000 ms) → 重置按鈕</pre>
+</section>
+
+<!-- ───────────────────────── 排程行為 ───────────────────────── -->
+<section id="behaviour">
+  <h2>排程器行為比較</h2>
+
+  <table>
+    <thead>
+      <tr><th>項目</th><th>未鎖定 🔓</th><th>鎖定 🔒</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>輪詢間隔</td><td>30 秒（固定）</td><td>對齊下一個 <code>HH:MM:00</code></td></tr>
+      <tr><td>時段偵測精度</td><td>時段後 0&ndash;30 秒</td><td>時段後 &lt; 1 秒</td></tr>
+      <tr><td>隨機延遲計算</td><td>偵測當下</td><td>偵測當下</td></tr>
+      <tr><td>倒數更新</td><td>每 1 秒</td><td>分鐘對齊</td></tr>
+      <tr><td>UI 控制項</td><td>可編輯</td><td>全部停用</td></tr>
+      <tr><td>下次觸發圖示</td><td>🔄</td><td>🔒</td></tr>
+      <tr><td>鎖定狀態持久化</td><td>✅ 儲存至 JSON</td><td>✅ 啟動時還原</td></tr>
+    </tbody>
+  </table>
+
+  <h3>倒數標籤格式</h3>
+  <pre><span class="c"># 未鎖定（每 1 秒更新）</span>
+"Executing in 4m 37s …"
+
+<span class="c"># 鎖定（分鐘對齊更新）</span>
+"Executing in 4 min …"
+"Executing in &lt; 1 min …"   <span class="c"># 最後一分鐘</span></pre>
+
+  <h3>日曆顏色</h3>
+  <table>
+    <thead><tr><th>狀態</th><th>平日</th><th>週末</th></tr></thead>
+    <tbody>
+      <tr><td><strong>ON</strong></td><td style="color:#1e7a40">■ GREEN_ON (#1e7a40)</td><td style="color:#c0392b">■ RED_ON (#c0392b)</td></tr>
+      <tr><td><strong>OFF</strong></td><td colspan="2" style="color:#3a3a3a">■ GREY_OFF (#3a3a3a)</td></tr>
+      <tr><td><strong>過去</strong></td><td colspan="2" style="color:#252525">■ GREY_PAST (#252525) &mdash; 停用</td></tr>
+      <tr><td><strong>今日</strong></td><td colspan="2" style="color:#f0c040">金色外框標示</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ───────────────────────── EMAIL 通知 ───────────────────────── -->
+<section id="alerts">
+  <h2>Email 通知</h2>
+  <p><code>SMTP_USER</code>、<code>SMTP_PASS</code>、<code>SMTP_HOST</code>、<code>NOTIFY_TO</code> 全部設定後才會發送通知。</p>
+  <table>
+    <thead><tr><th>觸發情境</th><th>主旨</th></tr></thead>
+    <tbody>
+      <tr><td>打卡時需要雙重驗證</td><td><code>[AutoID] ⚠ 2FA required — action pending</code></td></tr>
+      <tr><td>未設定密碼</td><td><code>[AutoID] ⚠ Manual login required — action pending</code></td></tr>
+      <tr><td>預先檢查發現 Session 過期</td><td><code>[AutoID] ⚠ Session expired — renew before next clock-in</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ───────────────────────── 已知問題 ───────────────────────── -->
+<section id="issues">
+  <h2>已知問題</h2>
+
+  <table>
+    <thead><tr><th>#</th><th>問題</th><th>說明 / 因應</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><strong>電腦休眠 / 休止</strong></td>
+        <td><code>after()</code> 在休眠期間暫停，恢復後可能大幅延遲。請透過 Windows 電源設定保持電腦不休眠。</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>延遲可能為 0 秒</strong></td>
+        <td>停用隨機延遲時，<code>randint(0,59)</code> 可能回傳 0，瀏覽器在整點觸發。</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>Session 過期</strong></td>
+        <td>預先檢查會寄送警示 Email（若已設定 SMTP）。建議每月執行 Auth Test 或 Renew Auth。</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>不支援國定假日</strong></td>
+        <td>日曆預設平日=ON，假日需手動切換日曆格。</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><strong>僅支援 2 個時段</strong></td>
+        <td>若每天只打一次卡，將兩個時段設為相同時間即可。</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><strong>雙重驗證逾時太短</strong></td>
+        <td>網路較慢時，請調高 <code>autoid_options.json</code> 中的 <code>2fa_timeout_secs</code>。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="alert">
+    ⚠ <strong>autoid_session.json</strong> 包含瀏覽器 Cookie 與 localStorage，屬於敏感資料。
+    請勿上傳至版本控制系統。
+  </div>
+</section>
+
+<!-- ───────────────────────── 檔案說明 ───────────────────────── -->
+<section id="files">
+  <h2>檔案說明</h2>
+  <table>
+    <thead><tr><th>檔案</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>AutoID.py</code></td><td>主程式</td></tr>
+      <tr><td><code>user.env</code></td><td>帳號密碼 + CMS 網址 + Session 選擇器 + SMTP &mdash; ⚠ 請勿上傳版控</td></tr>
+      <tr><td><code>autoid_schedule.json</code></td><td><code>{t1h, t1m, t2h, t2m, enabled, locked, overrides:{}}</code></td></tr>
+      <tr><td><code>autoid_options.json</code></td><td>所有選項，包含 <code>2fa_timeout_secs</code></td></tr>
+      <tr><td><code>autoid_session.json</code></td><td>Playwright 儲存狀態 &mdash; ⚠ 包含登入 Cookie，請勿上傳版控</td></tr>
+      <tr><td><code>autoid_session_ts.txt</code></td><td>上次儲存 Session 的 ISO 日期（<code>YYYY-MM-DD</code>）</td></tr>
+      <tr><td><code>log.log</code></td><td>附加模式的時間戳記錄</td></tr>
+      <tr><td><code>Rewolf.ico</code></td><td>視窗圖示</td></tr>
+    </tbody>
+  </table>
+
+  <h3>打包為 EXE</h3>
+  <pre>_pack.bat</pre>
+  <p>執行 <code>python ..&#92;_gen_version.py AutoID</code> &rarr; <code>pyi-makespec</code> &rarr; <code>pyinstaller</code>。<br>
+     目標電腦須另行安裝 Playwright Chromium：<code>playwright install chromium</code>。</p>
+
+  <h3>注意事項</h3>
+  <ul style="padding-left:1.4em; line-height:2.1">
+    <li><strong>首次執行：</strong>精靈會在找不到 <code>user.env</code> 時自動開啟。填入 CMS 網址、帳號、密碼，以及選填的 SMTP 設定。</li>
+    <li><strong>Session 更新：</strong>建議每月執行 Auth Test。若已過期，請點擊「Renew Auth」重新驗證。</li>
+    <li><strong>雙重驗證：</strong>打卡時若需要 2FA，瀏覽器會保持開啟。請手動完成驗證（勾選「記住我 30 天」）。</li>
+    <li><strong>鎖定模式：</strong>離開前按 🔒 進入鎖定模式，防止誤改排程。鎖定狀態重啟後仍會保留。</li>
+    <li><strong>記錄檔：</strong>旁邊的綠色 <strong>● ON</strong> 鈕控制是否寫入 <code>log.log</code>，程式內的記錄框無論如何都會顯示訊息。</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  AutoID &mdash; RunTime v1.0.1 &nbsp;&copy; 2026 ThexehT
+</footer>
+
+</body>
+</html>

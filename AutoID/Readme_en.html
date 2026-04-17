@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoID — Auto Clock-In</title>
+<style>
+  :root {
+    --bg:       #1e1e1e;
+    --bg2:      #252525;
+    --bg3:      #2b2b2b;
+    --panel:    #2d2d2d;
+    --border:   #3a3a3a;
+    --fg:       #d4d4d4;
+    --cyan:     #56d1ff;
+    --gold:     #f0c040;
+    --green:    #27ae60;
+    --red:      #c0392b;
+    --blue:     #1e6fb5;
+    --th-bg:    #1a3a4a;
+    --code-bg:  #1a1a1a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.65;
+    padding: 0 0 60px;
+  }
+
+  /* ── header ── */
+  header {
+    background: linear-gradient(135deg, #0d2a3a 0%, #1a1a2e 100%);
+    border-bottom: 2px solid var(--cyan);
+    padding: 40px 48px 32px;
+  }
+  header h1 { font-size: 2rem; color: var(--cyan); letter-spacing: .04em; }
+  header p  { margin-top: 8px; color: #aaa; max-width: 680px; }
+
+  /* ── nav ── */
+  nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 48px;
+    display: flex; flex-wrap: wrap; gap: 0;
+  }
+  nav a {
+    display: inline-block;
+    padding: 12px 16px;
+    color: #aaa;
+    text-decoration: none;
+    font-size: .85rem;
+    border-bottom: 2px solid transparent;
+    transition: color .2s, border-color .2s;
+  }
+  nav a:hover { color: var(--cyan); border-color: var(--cyan); }
+
+  /* ── layout ── */
+  main { max-width: 960px; margin: 0 auto; padding: 40px 48px; }
+  section { margin-bottom: 52px; }
+  h2 {
+    font-size: 1.35rem;
+    color: var(--cyan);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 20px;
+    scroll-margin-top: 16px;
+  }
+  h3 { font-size: 1.05rem; color: var(--gold); margin: 24px 0 10px; }
+  p  { margin-bottom: 12px; }
+
+  /* ── tables ── */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: .9rem; }
+  thead th {
+    background: var(--th-bg);
+    color: var(--cyan);
+    text-align: left;
+    padding: 9px 14px;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:nth-child(even) { background: var(--bg2); }
+  td, th { padding: 8px 14px; vertical-align: top; }
+  td:first-child { white-space: nowrap; }
+
+  /* ── code / pre ── */
+  code {
+    background: var(--code-bg);
+    color: var(--cyan);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: .88em;
+    font-family: "Cascadia Code", "Consolas", monospace;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    padding: 18px 20px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: .85rem;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    color: #c8c8c8;
+    margin-bottom: 20px;
+    line-height: 1.55;
+  }
+  pre .c  { color: #6a9955; }   /* comment  */
+  pre .k  { color: #569cd6; }   /* keyword  */
+  pre .s  { color: var(--gold); }/* string   */
+  pre .n  { color: var(--cyan); }/* number   */
+
+  /* ── badges / pills ── */
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 600;
+    margin-right: 4px;
+  }
+  .badge-blue  { background: #1e3a5f; color: var(--cyan); }
+  .badge-green { background: #1a3d28; color: #4caf7d; }
+  .badge-gold  { background: #3d2f00; color: var(--gold); }
+  .badge-red   { background: #3d1010; color: #e07070; }
+
+  /* ── flowchart boxes ── */
+  .flow-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    margin-bottom: 24px;
+  }
+  .flow-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 18px;
+    font-size: .88rem;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    min-width: 260px;
+    position: relative;
+  }
+  .flow-box.start  { border-color: var(--cyan);  color: var(--cyan); }
+  .flow-box.action { border-color: var(--blue);  color: #a0c8f0; }
+  .flow-box.decide { border-color: var(--gold);  color: var(--gold); background: #2a2300; }
+  .flow-box.end    { border-color: var(--green); color: #7ecfa0; }
+  .flow-arrow {
+    font-size: 1.2rem;
+    color: var(--border);
+    padding: 2px 0 2px 22px;
+    line-height: 1;
+  }
+
+  /* ── alert box ── */
+  .alert {
+    border-left: 3px solid var(--gold);
+    background: #2a2300;
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: .9rem;
+    margin-bottom: 16px;
+    color: #d4b84a;
+  }
+
+  /* ── UI mockup ── */
+  .mockup {
+    background: #2b2b2b;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 24px 28px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: .82rem;
+    line-height: 1.8;
+    max-width: 440px;
+  }
+  .mockup .clk  { color: var(--cyan);  font-size: 1.6rem; font-weight: 700; }
+  .mockup .sess { color: var(--green); }
+  .mockup .next { color: var(--gold); }
+  .mockup .btn-exec   { background: var(--blue);  color: #fff; padding: 2px 12px; border-radius: 3px; }
+  .mockup .btn-cancel { background: #6b3030; color: #aaa; padding: 2px 12px; border-radius: 3px; }
+  .mockup .btn-lock   { background: #7a5500; color: var(--gold); padding: 2px 10px; border-radius: 3px; }
+  .mockup .btn-auth   { background: #3a3a3a; color: var(--fg); padding: 2px 12px; border-radius: 3px; }
+  .mockup .btn-on     { background: var(--green); color: #fff; padding: 1px 10px; border-radius: 3px; }
+  .mockup .dim { color: #555; }
+  .mockup .grp { color: #aaf; }
+
+  footer {
+    text-align: center;
+    font-size: .78rem;
+    color: #555;
+    margin-top: 60px;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AutoID &mdash; Auto Clock-In</h1>
+  <p>Automated attendance tool for CMS. Opens Google Chrome via Playwright,
+     loads a saved 30-day session, and clicks <strong>線上打卡</strong> at
+     scheduled times with a humanised random delay.</p>
+  <div style="margin-top:14px">
+    <span class="badge badge-blue">Python 3.10+</span>
+    <span class="badge badge-blue">tkinter</span>
+    <span class="badge badge-blue">Playwright</span>
+    <span class="badge badge-gold">v1.0.1</span>
+    <span class="badge badge-green">RunTime</span>
+  </div>
+</header>
+
+<nav>
+  <a href="#brief">Brief</a>
+  <a href="#firstrun">First Run</a>
+  <a href="#userenv">user.env</a>
+  <a href="#overview">Overview</a>
+  <a href="#algorithm">Algorithm</a>
+  <a href="#flowcharts">Flow Charts</a>
+  <a href="#behaviour">Behaviour</a>
+  <a href="#alerts">Email Alerts</a>
+  <a href="#issues">Issues</a>
+  <a href="#files">Files</a>
+</nav>
+
+<main>
+
+<!-- ─────────────────────────── BRIEF ─────────────────────────────── -->
+<section id="brief">
+  <h2>Brief</h2>
+  <table>
+    <thead><tr><th>Item</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>App name</td><td>RunTime &nbsp;<code>_APP_NAME</code></td></tr>
+      <tr><td>Version</td><td>1.0.1</td></tr>
+      <tr><td>Config</td><td><code>user.env</code> (CMS URL, credentials, SMTP, session selectors)</td></tr>
+      <tr><td>Language</td><td>Python 3.10+</td></tr>
+      <tr><td>UI framework</td><td>tkinter — dark theme, fixed size</td></tr>
+      <tr><td>Browser engine</td><td>Playwright → Google Chrome (<code>channel="chrome"</code>)</td></tr>
+      <tr><td>Session lifetime</td><td>30 days (CMS &ldquo;Remember me&rdquo;)</td></tr>
+      <tr><td>Schedule file</td><td><code>autoid_schedule.json</code></td></tr>
+      <tr><td>Options file</td><td><code>autoid_options.json</code></td></tr>
+      <tr><td>Session files</td><td><code>autoid_session.json</code> + <code>autoid_session_ts.txt</code></td></tr>
+      <tr><td>Log file</td><td><code>log.log</code></td></tr>
+    </tbody>
+  </table>
+</section>
+<!-- ────────────────────────────── FIRST RUN ────────────────────────────── -->
+<section id="firstrun">
+  <h2>First Run</h2>
+  <p>On first launch (no <code>user.env</code> found), a setup wizard collects:</p>
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>CMS URL</strong></td><td>e.g. <code>https://cms.company.com/cms</code></td></tr>
+      <tr><td><strong>Account</strong></td><td>Login email</td></tr>
+      <tr><td><strong>Password</strong></td><td>Login password</td></tr>
+      <tr><td><strong>Expired selector</strong></td><td>CSS selector visible on login page (default <code>#email</code>)</td></tr>
+      <tr><td><strong>Valid selector</strong></td><td>Clock-in button text on dashboard (default <code>線上打卡</code>)</td></tr>
+      <tr><td><strong>SMTP settings</strong></td><td>Optional &mdash; leave blank to disable email alerts</td></tr>
+      <tr><td><strong>Notify To</strong></td><td>Up to 5 comma-separated addresses</td></tr>
+    </tbody>
+  </table>
+  <p>The wizard writes <code>user.env</code> next to the executable. All fields can be edited later in <code>user.env</code> directly.</p>
+</section>
+
+<!-- ────────────────────────────── USER.ENV ────────────────────────────── -->
+<section id="userenv">
+  <h2>user.env Reference</h2>
+  <pre><span class="c"># Required</span>
+CMS_URL=https://cms.company.com/cms
+EMAIL=user@company.com
+PASSWORD=your-password
+
+<span class="c"># Session selectors (change only if your CMS differs)</span>
+SESSION_EXPIRED_SEL=#email
+SESSION_VALID_SEL=線上打卡
+
+<span class="c"># SMTP email alerts (optional — leave blank to disable)</span>
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=sender@gmail.com
+SMTP_PASS=app-password
+NOTIFY_TO=you@example.com, colleague@example.com</pre>
+  <div class="alert">⚠ <code>SESSION_EXPIRED_SEL</code> must be a valid CSS selector (e.g. <code>#email</code>). Do <strong>not</strong> put an email address here.</div>
+</section>
+<!-- ─────────────────────────── OVERVIEW ──────────────────────────── -->
+<section id="overview">
+  <h2>Overview</h2>
+
+  <div class="mockup">
+    <div class="clk">11:03</div>
+    <div class="sess">Session expires in 30d &nbsp;(2026-05-10)</div>
+    <div class="next">🔒 Next trigger: Fri 08:06 &nbsp;(in 21h)</div>
+    <br>
+    <span class="btn-exec">Execute</span> &nbsp;
+    <span class="btn-cancel">Cancel</span> &nbsp;
+    <span class="btn-lock">🔒</span>
+    <br><br>
+    <span class="btn-auth">🔑 Auth Test</span>
+    <br><br>
+    <span class="grp">┌ Set Schedule ──────────────────┐</span><br>
+    <span class="grp">│</span> &nbsp;Time 1: &nbsp;<span style="color:var(--cyan)">08</span> : <span style="color:var(--cyan)">06</span><br>
+    <span class="grp">│</span> &nbsp;Time 2: &nbsp;<span style="color:var(--cyan)">18</span> : <span style="color:var(--cyan)">13</span><br>
+    <span class="grp">│</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="btn-on">● ON</span><br>
+    <span class="grp">│</span> &nbsp;◀ &nbsp;April 2026 &nbsp;▶<br>
+    <span class="grp">│</span> &nbsp;<span style="color:#9b2335">Sun</span> Mon Tue Wed Thu Fri <span style="color:#9b2335">Sat</span><br>
+    <span class="grp">│</span> &nbsp;<span class="dim">...calendar grid (green/grey/red)...</span><br>
+    <span class="grp">└────────────────────────────────┘</span><br>
+    <br>
+    <span class="btn-on" style="font-size:.8em">● ON</span> Save log to log.log<br>
+    <span class="dim">[scrolled log box]</span>
+  </div>
+
+  <h3>Automatic sequence</h3>
+  <ol style="padding-left:1.4em; line-height:2.1">
+    <li>App starts → load schedule, options, lock state from JSON files and <code>user.env</code></li>
+    <li>Scheduler watches <code>datetime.now()</code> for a slot match</li>
+    <li>Match found → compute random delay → start countdown</li>
+    <li>Countdown = 0 → open Chrome in a daemon thread → click <strong>線上打卡</strong></li>
+    <li>Browser stays open 3–10 min (random) → closes automatically</li>
+    <li>Scheduler re-arms for the next slot</li>
+  </ol>
+</section>
+
+<!-- ─────────────────────────── ALGORITHM ─────────────────────────── -->
+<section id="algorithm">
+  <h2>Algorithm</h2>
+
+  <h3>Random Delay — <code>_calc_delay(opts)</code></h3>
+  <pre><span class="c"># rand_enabled = True</span>
+delay = randint(min_min, max_min) × 60  +  randint(0, 59)   <span class="c"># seconds</span>
+<span class="c"># example: min=1, max=10  →  range 60 s … 659 s</span>
+
+<span class="c"># rand_enabled = False</span>
+delay = randint(0, 59)   <span class="c"># seconds  (⚠ can be 0)</span></pre>
+  <p>Delay is computed <strong>at the moment the slot is detected</strong>, not in advance.</p>
+
+  <h3>Next-Slot Scan — <code>_next_fire_dt()</code></h3>
+  <pre>slots = [(t1h, t1m), (t2h, t2m)]
+
+for days_ahead in 0 … 7:
+    d = today + days_ahead
+    if not is_day_on(d):  <span class="k">skip</span>
+
+    for (h, m) in sorted(slots):    <span class="c"># earlier time wins</span>
+        dt = datetime(d.year, d.month, d.day, h, m)
+        if dt > now:  <span class="k">return</span> dt
+
+<span class="k">return</span> None   <span class="c"># schedule OFF or no enabled day in window</span></pre>
+  <p><code>is_day_on(d)</code> — checks <code>overrides[d.isoformat()]</code> first, then defaults to <code>weekday &lt; 5</code>.</p>
+
+  <h3>Slot Detection — <code>_tick_schedule()</code></h3>
+  <pre>purge _fired_keys older than today
+
+if enabled AND today is ON:
+    key = <span class="s">"YYYY-MM-DD HH:MM"</span>
+    if key NOT in _fired_keys:
+        for (h, m) in slots:
+            if now.hour == h AND now.minute == m:
+                _fired_keys.add(key)
+                _do_fire()
+                <span class="k">break</span>
+
+re-arm:
+    locked   → after(ms_until_next_:00)   <span class="c"># ~1 min  — minute boundary</span>
+    unlocked → after(30 000)               <span class="c"># every 30 seconds</span></pre>
+  <p><code>_fired_keys</code> is a <code>set[str]</code> — prevents double-trigger within the same slot minute regardless of how many times the poll fires that minute.</p>
+
+  <h3>Minute-Alignment Formula</h3>
+  <pre>now = datetime.now()
+ms_next = (60 - now.second) * 1000 - now.microsecond // 1000
+after(max(ms_next, 500), callback)</pre>
+  <p>Both <code>_tick_clock</code> and <code>_tick_schedule</code> (locked) use this formula, keeping the clock display and scheduler in sync at the true <code>:00</code> boundary.</p>
+</section>
+
+<!-- ─────────────────────────── FLOW CHARTS ───────────────────────── -->
+<section id="flowcharts">
+  <h2>Flow Charts</h2>
+
+  <h3>Startup</h3>
+  <pre>python AutoID.py
+    └─ App.__init__()
+          ├─ _load_sched()  → {t1h, t1m, t2h, t2m, enabled, locked, overrides}
+          ├─ _load_opts()   → {rand_enabled, min_min, max_min}
+          ├─ Build UI widgets
+          ├─ _tick_clock()       ───► loops forever  (minute-aligned UI refresh)
+          ├─ _tick_schedule()    ───► loops forever  (scheduler poll)
+          └─ if sched["locked"] == True:
+                   _toggle_lock()   → restore lock, disable controls</pre>
+
+  <h3>Schedule Fire Chain</h3>
+  <pre>_tick_schedule()  detects slot match
+      │
+      ▼
+_do_fire()
+      ├── delay    = _calc_delay(opts)
+      ├── exec_dt  = now + delay
+      ├── log("triggered … exec at HH:MM:SS")
+      └── _on_execute(pre_delay=delay, scheduled=True)
+                │
+                ├── disable Execute btn   enable Cancel btn
+                ├── _exec_target_dt = now + delay
+                └── _run_countdown()  ◄─────────────────────┐
+                          │                                  │
+                          ├── cancelled?  → _reset_btns()   │
+                          ├── remaining ≤ 0? → _launch()    │
+                          └── update cd label → after(Δms) ─┘
+                                  │
+                                  ▼  (remaining = 0)
+                          _launch()  [daemon thread]
+                                  │
+                                  ▼
+                          clock_in(log, set_cd, stop, close_secs, tfa_timeout_ms)
+                              ├── Chrome.launch(headless=False, channel="chrome")
+                              ├── Load autoid_session.json
+                              ├── Navigate → CMS_URL
+                              ├── SEL_EXPIRED visible?
+                              │       YES → fill email + password → Submit
+                              │             wait SEL_CLOCKIN (tfa_timeout_secs)
+                              │               success → save session
+                              │               timeout → 2FA: send alert, wait indefinitely
+                              ├── Locate SEL_CLOCKIN  (15 s timeout)
+                              ├── Click
+                              ├── Wait random close_secs  (check stop every 1 s)
+                              └── browser.close()</pre>
+
+  <h3>Lock Toggle</h3>
+  <pre>User clicks 🔒 / 🔓
+      │
+      ▼
+_toggle_lock()
+      ├── flip _lock_var
+      │
+      ├── locked=True  → DISABLE: spinboxes, ON/OFF btn, day btns, Options menu
+      │   locked=False → ENABLE:  all above
+      │
+      ├── _refresh_lock_btn()         update colour + emoji
+      ├── update window title         add / remove 🔒 prefix
+      ├── save {"locked": bool}  →  autoid_schedule.json
+      │
+      ├── cancel current _poll_id
+      └── _tick_schedule()
+                locked   → after(ms_until_:00)   minute-aligned
+                unlocked → after(30 000)          every 30 s</pre>
+
+  <h3>Auth Test</h3>
+  <pre>User clicks 🔑 Auth Test
+      │
+      ▼
+_test_auth()  [daemon thread]
+      ├── Chrome.launch(headless=True, channel="chrome")
+      ├── Load autoid_session.json
+      ├── Navigate → CMS_URL
+      ├── SEL_EXPIRED visible?
+      │       True  → expired = True
+      │       False → expired = False
+      ├── browser.close()
+      └── _auth_done(expired)
+                None  → ⚠ error           dark-red button
+                True  → ❌ Session Expired  RED_ON button
+                False → ✅ Session Valid    GREEN_ON button
+                after(5 000 ms) → reset button to default text</pre>
+</section>
+
+<!-- ─────────────────────────── BEHAVIOUR ─────────────────────────── -->
+<section id="behaviour">
+  <h2>Scheduler Behaviour</h2>
+
+  <table>
+    <thead>
+      <tr><th>Aspect</th><th>Unlocked 🔓</th><th>Locked 🔒</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Poll interval</td><td>30 s (fixed)</td><td>Aligned to next <code>HH:MM:00</code></td></tr>
+      <tr><td>Slot detection accuracy</td><td>0 – 30 s after slot</td><td>&lt; 1 s after slot</td></tr>
+      <tr><td>Delay generated</td><td>At detection moment</td><td>At detection moment</td></tr>
+      <tr><td>Countdown ticks</td><td>Every 1 second</td><td>Minute-aligned</td></tr>
+      <tr><td>UI controls</td><td>Fully editable</td><td>All disabled</td></tr>
+      <tr><td>Next-fire icon</td><td>🔄</td><td>🔒</td></tr>
+      <tr><td>Lock state persisted</td><td>✅ saved to JSON</td><td>✅ restored on startup</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Countdown Label Format</h3>
+  <pre><span class="c"># Unlocked (1 s ticks)</span>
+"Executing in 4m 37s …"
+
+<span class="c"># Locked   (minute-aligned ticks)</span>
+"Executing in 4 min …"
+"Executing in &lt; 1 min …"   <span class="c"># last minute</span></pre>
+
+  <h3>Calendar Colours</h3>
+  <table>
+    <thead><tr><th>State</th><th>Weekday</th><th>Weekend</th></tr></thead>
+    <tbody>
+      <tr><td><strong>ON</strong></td><td style="color:#1e7a40">■ GREEN_ON (#1e7a40)</td><td style="color:#c0392b">■ RED_ON (#c0392b)</td></tr>
+      <tr><td><strong>OFF</strong></td><td colspan="2" style="color:#3a3a3a">■ GREY_OFF (#3a3a3a)</td></tr>
+      <tr><td><strong>Past</strong></td><td colspan="2" style="color:#252525">■ GREY_PAST (#252525) — disabled</td></tr>
+      <tr><td><strong>Today</strong></td><td colspan="2" style="color:#f0c040">Gold border highlight</td></tr>
+    </tbody>
+  </table>
+</section>
+<!-- ────────────────────────────── ALERTS ────────────────────────────── -->
+<section id="alerts">
+  <h2>Email Alerts</h2>
+  <p>Alerts are sent when <code>SMTP_USER</code>, <code>SMTP_PASS</code>, <code>SMTP_HOST</code>, and <code>NOTIFY_TO</code> are all set.</p>
+  <table>
+    <thead><tr><th>Trigger</th><th>Subject</th></tr></thead>
+    <tbody>
+      <tr><td>2FA required during clock-in</td><td><code>[AutoID] ⚠ 2FA required — action pending</code></td></tr>
+      <tr><td>No password configured</td><td><code>[AutoID] ⚠ Manual login required — action pending</code></td></tr>
+      <tr><td>Session expired (pre-check)</td><td><code>[AutoID] ⚠ Session expired — renew before next clock-in</code></td></tr>
+    </tbody>
+  </table>
+</section>
+<!-- ─────────────────────────── ISSUES ────────────────────────────── -->
+<section id="issues">
+  <h2>Potential Issues</h2>
+
+  <table>
+    <thead><tr><th>#</th><th>Issue</th><th>Notes / Mitigation</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><strong>Machine sleep / hibernate</strong></td>
+        <td><code>after()</code> pauses while machine sleeps; resumes late. No missed-slot detection. Keep machine awake via Windows power settings.</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>Delay can be 0 s</strong></td>
+        <td>When random disabled, <code>randint(0,59)</code> can return 0 → browser fires at exactly <code>:00</code>. Fix: change to <code>randint(1,59)</code>.</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>Session expiry</strong></td>
+        <td>A 1-hour pre-check runs before each slot. If the session is expired, an alert email is sent (if SMTP configured). Run <strong>Auth Test</strong> monthly or use <strong>Renew Auth</strong>.</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>No public holiday support</strong></td>
+        <td>Calendar defaults to weekday=ON. Toggle cells manually for national holidays.</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><strong>Only 2 time slots</strong></td>
+        <td>Set both to same time if only 1 clock-in per day is needed.</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><strong>2FA timeout too short</strong></td>
+        <td>Increase <code>2fa_timeout_secs</code> in <code>autoid_options.json</code> if login is slow.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="alert">
+    ⚠ <strong>autoid_session.json</strong> contains browser cookies and localStorage.
+    Keep it local — do not commit to version control.
+  </div>
+</section>
+
+<!-- ─────────────────────────── FILES ─────────────────────────────── -->
+<section id="files">
+  <h2>File Reference</h2>
+  <table>
+    <thead><tr><th>File</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><code>AutoID.py</code></td><td>Main application</td></tr>
+      <tr><td><code>user.env</code></td><td>Credentials + CMS URL + session selectors + SMTP &mdash; ⚠ keep private</td></tr>
+      <tr><td><code>autoid_schedule.json</code></td><td><code>{t1h, t1m, t2h, t2m, enabled, locked, overrides:{}}</code></td></tr>
+      <tr><td><code>autoid_options.json</code></td><td>All options including <code>2fa_timeout_secs</code></td></tr>
+      <tr><td><code>autoid_session.json</code></td><td>Playwright storage state — ⚠ sensitive, contains login cookies</td></tr>
+      <tr><td><code>autoid_session_ts.txt</code></td><td>Plain-text ISO date of last session save (<code>YYYY-MM-DD</code>)</td></tr>
+      <tr><td><code>log.log</code></td><td>Append-only timestamped execution log</td></tr>
+      <tr><td><code>Rewolf.ico</code></td><td>Window icon (tries script dir first, then parent)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Build EXE</h3>
+  <pre>_pack.bat</pre>
+  <p>Runs <code>python ..&#92;_gen_version.py AutoID</code> &rarr; <code>pyi-makespec</code> &rarr; <code>pyinstaller</code>.<br>
+     Playwright Chromium must be installed on the target machine: <code>playwright install chromium</code>.</p>
+</section>
+
+</main>
+
+<footer>
+  Auto ClockIn &mdash; RunTime v1.0.1 &nbsp;&copy; 2026 ThexehT
+</footer>
+
+</body>
+</html>
