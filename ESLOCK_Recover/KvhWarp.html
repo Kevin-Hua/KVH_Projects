@@ -19,6 +19,7 @@
 <nav>
   <h3>📑 <span class="zhi">目錄</span><span class="eni">Contents</span></h3>
   <a href="#overview">      <span class="zhi">概覽</span>              <span class="eni">Overview</span></a>
+  <a href="#architecture"> <span class="zhi">架構</span>              <span class="eni">Architecture</span></a>
   <a href="#format">        <span class="zhi">檔案格式</span>          <span class="eni">File Format</span></a>
   <a href="#algorithms">    <span class="zhi">加密演算法</span>        <span class="eni">Algorithms</span></a>
   <a href="#layers">        <span class="zhi">加密層次</span>          <span class="eni">Encryption Layers</span></a>
@@ -30,7 +31,7 @@
   <a href="#examples">      <span class="zhi">使用範例</span>          <span class="eni">Examples</span></a>
   <a href="#security">      <span class="zhi">安全分析</span>          <span class="eni">Security</span></a>
   <a href="#limits">        <span class="zhi">限制與風險</span>        <span class="eni">Limitations</span></a>
-  <a href="#test-results"> <span class="zhi">測試結果（8 套件）</span>  <span class="eni">Test Results (8 Suites)</span></a>
+  <a href="#test-results"> <span class="zhi">測試結果（11 套件）</span>  <span class="eni">Test Results (11 Suites)</span></a>
 </nav>
 
 <main>
@@ -62,6 +63,97 @@
     </ul>
     <p>Encrypted files are renamed to random nanosecond timestamps (<code>1745000000000000000.ks</code>). Original filename, size and timestamps are stored encrypted inside the metadata.</p>
   </div>
+</div>
+</section>
+
+<!-- ===== Architecture ===== -->
+<section id="architecture">
+<div class="icon-title">🏗️ <span class="zhi">模組架構</span><span class="eni">Module Architecture</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <div class="zh">
+    <p>KvhWarp 重構後分為三個獨立模組，各司其職：</p>
+    <table>
+      <thead><tr><th>模組</th><th>角色</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>kvhwarp_core.py</code></td>
+          <td><span class="badge badge-green">純函式庫</span></td>
+          <td>所有加解密邏輯、KDF、壓縮、metadata、資料夾操作。無 UI 依賴。</td>
+        </tr>
+        <tr>
+          <td><code>KvhWarp.py</code></td>
+          <td><span class="badge badge-yellow">GUI 入口</span></td>
+          <td>tkinter 視窗介面。從 <code>kvhwarp_core</code> 匯入所有功能，不含業務邏輯。</td>
+        </tr>
+        <tr>
+          <td><code>KvhWarp_CLI.py</code></td>
+          <td><span class="badge badge-yellow">CLI 入口</span></td>
+          <td>argparse 命令列介面。從 <code>kvhwarp_core</code> 匯入所有功能，不含業務邏輯。</td>
+        </tr>
+      </tbody>
+    </table>
+    <pre style="margin-top:16px">kvhwarp_core.py          ← 純函式庫（warp_file / unwarp_auto / KDF / 壓縮 / 資料夾）
+      ↑                ↑
+KvhWarp.py (GUI)   KvhWarp_CLI.py (CLI)
+  tkinter App        argparse sub-commands
+  import *           import *</pre>
+    <p style="margin-top:12px">核心函式庫的對外 API：</p>
+    <table>
+      <thead><tr><th>函式 / 常數</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>warp_file(path, pw, **opts)</code></td><td>Copy 模式加密（產生 .ks 副本）</td></tr>
+        <tr><td><code>warp_file_inplace(path, pw, **opts)</code></td><td>In-place 模式加密（修改原始檔）</td></tr>
+        <tr><td><code>unwarp_auto(path, pw)</code></td><td>自動偵測格式並解密</td></tr>
+        <tr><td><code>rename_subfolders / restore_subfolders / cleanup_empty_dirs</code></td><td>資料夾混淆工具</td></tr>
+        <tr><td><code>_generate_hybrid_password(pw, path)</code></td><td>密碼增強（Enhancement）</td></tr>
+        <tr><td><code>KDF_SCRYPT / KDF_SHA256 / ENCRYPT_SIZE / KS_EXT / _DEFAULTS</code></td><td>共用常數</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="en">
+    <p>After refactoring, KvhWarp is split into three independent modules:</p>
+    <table>
+      <thead><tr><th>Module</th><th>Role</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>kvhwarp_core.py</code></td>
+          <td><span class="badge badge-green">Pure library</span></td>
+          <td>All crypto, KDF, compression, metadata, folder operations. Zero UI dependencies.</td>
+        </tr>
+        <tr>
+          <td><code>KvhWarp.py</code></td>
+          <td><span class="badge badge-yellow">GUI entry point</span></td>
+          <td>tkinter window. Imports everything from <code>kvhwarp_core</code>. Contains no business logic.</td>
+        </tr>
+        <tr>
+          <td><code>KvhWarp_CLI.py</code></td>
+          <td><span class="badge badge-yellow">CLI entry point</span></td>
+          <td>argparse CLI. Imports everything from <code>kvhwarp_core</code>. Contains no business logic.</td>
+        </tr>
+      </tbody>
+    </table>
+    <pre style="margin-top:16px">kvhwarp_core.py          ← Pure library (warp_file / unwarp_auto / KDF / compress / folders)
+      ↑                ↑
+KvhWarp.py (GUI)   KvhWarp_CLI.py (CLI)
+  tkinter App        argparse sub-commands
+  import *           import *</pre>
+    <p style="margin-top:12px">Core library public API:</p>
+    <table>
+      <thead><tr><th>Function / Constant</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>warp_file(path, pw, **opts)</code></td><td>Copy mode encryption (produces .ks copy)</td></tr>
+        <tr><td><code>warp_file_inplace(path, pw, **opts)</code></td><td>In-place mode encryption (modifies original)</td></tr>
+        <tr><td><code>unwarp_auto(path, pw)</code></td><td>Auto-detect format and decrypt</td></tr>
+        <tr><td><code>rename_subfolders / restore_subfolders / cleanup_empty_dirs</code></td><td>Folder obfuscation helpers</td></tr>
+        <tr><td><code>_generate_hybrid_password(pw, path)</code></td><td>Password enhancement</td></tr>
+        <tr><td><code>KDF_SCRYPT / KDF_SHA256 / ENCRYPT_SIZE / KS_EXT / _DEFAULTS</code></td><td>Shared constants</td></tr>
+      </tbody>
+    </table>
+  </div>
+
 </div>
 </section>
 
@@ -883,10 +975,9 @@ enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
 
     <h3 style="color:var(--blue);margin:24px 0 14px">Middle CTR（中央 AES-256-CTR）</h3>
     <table>
-      <thead><tr><th>選項</th><th>預設</th><th>說明</th></tr></thead>
+      <thead><tr><th>選項（warp_file 參數）</th><th>預設</th><th>說明</th></tr></thead>
       <tbody>
-        <tr><td><code>encrypt_middle_copy</code></td><td>True</td><td>Copy 模式預設開啟</td></tr>
-        <tr><td><code>encrypt_middle_inplace</code></td><td>False</td><td>In-place 模式預設關閉</td></tr>
+        <tr><td><code>encrypt_middle</code></td><td>True</td><td>啟用中央 CTR（CLI 預設 copy 模式=True，in-place=False）</td></tr>
         <tr><td><code>encrypt_middle_size</code></td><td>1,048,576</td><td>中央 CTR 區域大小（bytes）</td></tr>
       </tbody>
     </table>
@@ -894,18 +985,36 @@ enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
 
     <h3 style="color:var(--blue);margin:24px 0 14px">Range CTR（步進 AES-256-CTR）</h3>
     <table>
-      <thead><tr><th>選項</th><th>預設</th><th>說明</th></tr></thead>
+      <thead><tr><th>選項（warp_file 參數）</th><th>預設</th><th>說明</th></tr></thead>
       <tbody>
         <tr><td><code>encrypt_range</code></td><td>False</td><td>啟用 B/C 步進 CTR</td></tr>
-        <tr><td><code>range_mode</code></td><td>auto</td><td><code>auto</code>（按比例）或 <code>manual</code>（手動 B/C）</td></tr>
-        <tr><td><code>range_percent</code></td><td>25</td><td>Auto 模式：每週期加密 %</td></tr>
-        <tr><td><code>range_start_mb</code></td><td>0.0</td><td>Range 起始（MB）</td></tr>
-        <tr><td><code>range_end_mb</code></td><td>0.0</td><td>Range 結束（MB），0 = 至檔案末</td></tr>
-        <tr><td><code>range_b</code></td><td>1</td><td>Manual 模式：每週期加密 N 個 unit</td></tr>
-        <tr><td><code>range_c</code></td><td>4</td><td>Manual 模式：週期 N 個 unit</td></tr>
-        <tr><td><code>range_unit</code></td><td>KB</td><td>B / KB / MB</td></tr>
+        <tr><td><code>range_mode</code></td><td>"manual"</td><td><code>"auto"</code>（按比例自動計算 B/C）或 <code>"manual"</code>（手動指定）</td></tr>
+        <tr><td><code>range_percent</code></td><td>25</td><td>Auto 模式：每週期加密 %（1–99）</td></tr>
+        <tr><td><code>range_start</code></td><td>0</td><td>Range 起始位元（bytes），0 = 檔案首部</td></tr>
+        <tr><td><code>range_end</code></td><td>0</td><td>Range 結束位元（bytes），0 = 檔案末（CLI 輸入單位為 MB）</td></tr>
+        <tr><td><code>range_b_bytes</code></td><td>16</td><td>Manual 模式：每週期加密 bytes（16 的倍數）</td></tr>
+        <tr><td><code>range_c_bytes</code></td><td>64</td><td>Manual 模式：週期總長 bytes</td></tr>
       </tbody>
     </table>
+    <p style="margin-top:8px;color:var(--muted);font-size:.88rem">ℹ️ CLI 的 <code>--range-b / --range-c / --range-unit</code> 組合後轉換為 bytes。<code>--range-start / --range-end</code> 單位為 MB。</p>
+
+    <h3 style="color:var(--blue);margin:24px 0 14px">自適應壓縮（Copy 模式限定）</h3>
+    <p>啟用後先以 Zstandard 壓縮原始檔，再執行加密；解密時自動還原。需安裝 <code>pip install zstandard</code>，否則靜默略過。</p>
+    <table>
+      <thead><tr><th>選項</th><th>預設</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>compress_copy</code></td><td>False</td><td>Copy 模式啟用壓縮（GUI 設定）</td></tr>
+        <tr><td><code>compress_max_mb</code></td><td>500</td><td>大小門檻（MB）；超過則不壓縮（0 = 無限制）</td></tr>
+        <tr><td><code>compress_skip_exts</code></td><td>內建清單</td><td>不嘗試壓縮的副檔名（已壓縮格式：mp4、zip、jpg…）</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:10px"><strong>四道關卡（任一不過即略過壓縮）：</strong></p>
+    <ol style="margin:6px 0 0 18px;line-height:1.8">
+      <li><strong>副檔名關卡</strong>：副檔名在 skip_exts 清單中 → 略過</li>
+      <li><strong>大小關卡</strong>：檔案 &gt; compress_max_mb → 略過</li>
+      <li><strong>熵值關卡</strong>：Shannon 熵 &gt; 6.8 bit/byte（高度壓縮格式）→ 略過；熵 &lt; 5.5 使用 Zstd level 10，5.5–6.8 線性插值 level 3–9</li>
+      <li><strong>節省關卡</strong>：壓縮後大小 ≥ 原始大小 × 0.95 → 捨棄壓縮</li>
+    </ol>
   </div>
 
   <div class="en">
@@ -922,10 +1031,9 @@ enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
 
     <h3 style="color:var(--blue);margin:24px 0 14px">Middle CTR (Center-Anchored AES-256-CTR)</h3>
     <table>
-      <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
+      <thead><tr><th>Option (<code>warp_file</code> param)</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>encrypt_middle_copy</code></td><td>True</td><td>Enabled by default in copy mode</td></tr>
-        <tr><td><code>encrypt_middle_inplace</code></td><td>False</td><td>Disabled by default in in-place mode</td></tr>
+        <tr><td><code>encrypt_middle</code></td><td>True</td><td>Enable center CTR (CLI default: True for copy mode, False for in-place)</td></tr>
         <tr><td><code>encrypt_middle_size</code></td><td>1,048,576</td><td>Center CTR region size (bytes)</td></tr>
       </tbody>
     </table>
@@ -933,18 +1041,36 @@ enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
 
     <h3 style="color:var(--blue);margin:24px 0 14px">Range CTR (B/C-Stride AES-256-CTR)</h3>
     <table>
-      <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
+      <thead><tr><th>Option (<code>warp_file</code> param)</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td><code>encrypt_range</code></td><td>False</td><td>Enable B/C stride CTR</td></tr>
-        <tr><td><code>range_mode</code></td><td>auto</td><td><code>auto</code> (by percent) or <code>manual</code> (explicit B/C)</td></tr>
-        <tr><td><code>range_percent</code></td><td>25</td><td>Auto mode: encrypt % per period</td></tr>
-        <tr><td><code>range_start_mb</code></td><td>0.0</td><td>Range start (MB)</td></tr>
-        <tr><td><code>range_end_mb</code></td><td>0.0</td><td>Range end (MB), 0 = file end</td></tr>
-        <tr><td><code>range_b</code></td><td>1</td><td>Manual mode: encrypt N units per period</td></tr>
-        <tr><td><code>range_c</code></td><td>4</td><td>Manual mode: period N units</td></tr>
-        <tr><td><code>range_unit</code></td><td>KB</td><td>B / KB / MB</td></tr>
+        <tr><td><code>range_mode</code></td><td>"manual"</td><td><code>"auto"</code> (compute B/C from percent) or <code>"manual"</code> (explicit bytes)</td></tr>
+        <tr><td><code>range_percent</code></td><td>25</td><td>Auto mode: encrypt % per period (1–99)</td></tr>
+        <tr><td><code>range_start</code></td><td>0</td><td>Range start offset (bytes), 0 = file head</td></tr>
+        <tr><td><code>range_end</code></td><td>0</td><td>Range end offset (bytes), 0 = file end (CLI input unit: MB)</td></tr>
+        <tr><td><code>range_b_bytes</code></td><td>16</td><td>Manual mode: encrypted bytes per period (multiple of 16)</td></tr>
+        <tr><td><code>range_c_bytes</code></td><td>64</td><td>Manual mode: total period length (bytes)</td></tr>
       </tbody>
     </table>
+    <p style="margin-top:8px;color:var(--muted);font-size:.88rem">ℹ️ CLI flags <code>--range-b / --range-c / --range-unit</code> are multiplied to produce bytes. <code>--range-start / --range-end</code> inputs are in MB.</p>
+
+    <h3 style="color:var(--blue);margin:24px 0 14px">Adaptive Compression (Copy Mode Only)</h3>
+    <p>When enabled, the source file is compressed with Zstandard before encryption; decompression is applied automatically on unwarp. Requires <code>pip install zstandard</code> — silently skipped if unavailable.</p>
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>compress_copy</code></td><td>False</td><td>Enable compression in copy mode (GUI setting)</td></tr>
+        <tr><td><code>compress_max_mb</code></td><td>500</td><td>Skip compression if file exceeds this MB (0 = unlimited)</td></tr>
+        <tr><td><code>compress_skip_exts</code></td><td>built-in list</td><td>Extensions exempt from compression (already-compressed formats: mp4, zip, jpg…)</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:10px"><strong>Four ordered gates (any failure silently skips compression):</strong></p>
+    <ol style="margin:6px 0 0 18px;line-height:1.8">
+      <li><strong>Extension gate</strong>: suffix in skip_exts list → skip</li>
+      <li><strong>Size gate</strong>: file &gt; compress_max_mb → skip</li>
+      <li><strong>Entropy gate</strong>: Shannon entropy &gt; 6.8 bit/byte (already dense) → skip; entropy &lt; 5.5 uses Zstd level 10, 5.5–6.8 interpolated levels 3–9</li>
+      <li><strong>Savings guard</strong>: compressed size ≥ original × 0.95 → discard</li>
+    </ol>
   </div>
 
 </div>
@@ -985,6 +1111,7 @@ enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
         <tr><td><code>--range-b N</code></td><td>Manual: 每週期加密 N 個 unit</td></tr>
         <tr><td><code>--range-c N</code></td><td>Manual: 週期 N 個 unit</td></tr>
         <tr><td><code>--range-unit {B,KB,MB}</code></td><td>B/C 單位</td></tr>
+        <tr><td><code>--enhance</code></td><td>密碼增強：每個檔案以路徑衍生独立密鑰</td></tr>
       </tbody>
     </table>
   </div>
@@ -1018,6 +1145,7 @@ Commands:
         <tr><td><code>--range-b N</code></td><td>Manual: encrypt N units per period</td></tr>
         <tr><td><code>--range-c N</code></td><td>Manual: period is N units</td></tr>
         <tr><td><code>--range-unit {B,KB,MB}</code></td><td>Unit for B/C values</td></tr>
+        <tr><td><code>--enhance</code></td><td>Password enhancement: derive per-file key from path + password</td></tr>
       </tbody>
     </table>
   </div>
@@ -1255,7 +1383,7 @@ python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
 <div class="panel">
   <div class="zh">
     <p>測試日期：<strong>2026-04-20</strong>&nbsp;｜&nbsp;版本：<strong>v1.0.3</strong>&nbsp;｜&nbsp;平台：Windows 11 / Python 3.14</p>
-    <p>共 8 個測試套件，涵蓋 Copy 模式、In-place 模式、is_warped()、base_folder、錯誤路徑、邊界值、模式等效性與資料夾功能，總計 <strong>890 次</strong>測試。</p>
+    <p>共 17 個測試套件，涵蓋 Copy 模式、In-place 模式（全組合矩陣 / 隨機 / Range / Middle / 邊界擴充 / 500 次全隨機）、is_warped()、base_folder、錯誤路徑、邊界值、模式等效性、資料夾功能、<strong>自適應壓縮</strong>、<strong>Range 參數全覆蓋</strong>與 <strong>Middle CTR 大小矩陣</strong>，總計 <strong>2187 次</strong>測試。</p>
     <table>
       <thead><tr><th>套件</th><th>測試腳本</th><th>說明</th><th>總次數</th><th>PASS</th><th>FAIL</th></tr></thead>
       <tbody>
@@ -1267,14 +1395,23 @@ python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
         <tr><td>6</td><td><code>_test_boundaries.py</code></td><td>邊界值（最小檔案 / 極值 encrypt_size / range 邊界）</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
         <tr><td>7</td><td><code>_test_folders.py</code></td><td>資料夾 rename / restore / cleanup 功能</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
         <tr><td>8</td><td><code>_test_mode_equivalence.py</code></td><td>Copy 與 In-place 模式輸出 SHA-256 等效性</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
-        <tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="3">合計</td><td>890</td><td style="color:var(--green)">890</td><td>0</td></tr>
+        <tr><td>9</td><td><code>_test_compress_copy.py</code></td><td>Copy 模式自適應壓縮（副檔名 / 熵值 / 大小關卡 + 隨機）</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>10</td><td><code>_test_range_params.py</code></td><td>Range CTR 參數完整覆蓋（percent 1–99% / b/c 組合 / 起訖位元）</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>11</td><td><code>_test_middle_size.py</code></td><td>encrypt_middle_size 矩陣（1KB–100MB / 邊界 / 截斷 / 組合）</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>12</td><td><code>_test_inplace_combos.py</code></td><td>In-place 全組合矩陣（48 組合 × 3 檔案，含 timing top-10）</td><td>144</td><td style="color:var(--green)">144</td><td>0</td></tr>
+        <tr><td>13</td><td><code>_test_inplace_random.py</code></td><td>In-place 隨機往返（100 次，含大 middle_size 池）</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>14</td><td><code>_test_inplace_range_params.py</code></td><td>In-place Range CTR 參數完整覆蓋（auto percent / manual b/c / start/end 位元）</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>15</td><td><code>_test_inplace_middle_size.py</code></td><td>In-place encrypt_middle_size 矩陣（掃描 / 邊界 / 截斷 / middle+tail / middle+range）</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>16</td><td><code>_test_inplace_boundary_ext.py</code></td><td>In-place 邊界擴充（auto percent 邊界 / tail 靜默截斷 / scrypt 組合）</td><td>53</td><td style="color:var(--green)">53</td><td>0</td></tr>
+        <tr><td>17</td><td><code>_test_inplace_full_random.py</code></td><td>In-place 全隨機（500 次，所有參數隨機，SEED=20260420）</td><td>500</td><td style="color:var(--green)">500</td><td>0</td></tr>
+        <tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="3">合計</td><td>2187</td><td style="color:var(--green)">2187</td><td>0</td></tr>
       </tbody>
     </table>
-    <div class="note-box" style="margin-top:14px">全部 890 次測試<strong>零失敗</strong>。測試涵蓋：固定組合矩陣、完全隨機參數、邊界值、錯誤注入、模式等效性與資料夾操作。</div>
+    <div class="note-box" style="margin-top:14px">全部 2187 次測試<strong>零失敗</strong>。測試涵蓋：Copy / In-place 全組合矩陣、完全隨機參數、In-place 500 次全隨機、邊界值與靜默截斷驗證、錯誤注入、模式等效性、資料夾操作、壓縮關卡、Range CTR 全參數與 Middle CTR 大小矩陣。</div>
   </div>
   <div class="en">
     <p>Test date: <strong>2026-04-20</strong>&nbsp;|&nbsp;Version: <strong>v1.0.3</strong>&nbsp;|&nbsp;Platform: Windows 11 / Python 3.14</p>
-    <p>8 test suites covering copy mode, in-place mode, is_warped(), base_folder, error paths, boundary values, mode equivalence and folder functions — <strong>890 total runs</strong>.</p>
+    <p>17 test suites covering copy mode, in-place mode (full matrix / random / range / middle / boundary ext / 500 full-random), is_warped(), base_folder, error paths, boundary values, mode equivalence, folder functions, <strong>adaptive compression</strong>, <strong>full range parameter coverage</strong> and <strong>middle_size matrix</strong> — <strong>2187 total runs</strong>.</p>
     <table>
       <thead><tr><th>Suite</th><th>Script</th><th>Description</th><th>Total</th><th>PASS</th><th>FAIL</th></tr></thead>
       <tbody>
@@ -1286,10 +1423,19 @@ python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
         <tr><td>6</td><td><code>_test_boundaries.py</code></td><td>Boundary values (min file / extreme encrypt_size / range edges)</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
         <tr><td>7</td><td><code>_test_folders.py</code></td><td>Folder rename / restore / cleanup functions</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
         <tr><td>8</td><td><code>_test_mode_equivalence.py</code></td><td>Copy vs in-place SHA-256 output equivalence</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
-        <tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="3">Total</td><td>890</td><td style="color:var(--green)">890</td><td>0</td></tr>
+        <tr><td>9</td><td><code>_test_compress_copy.py</code></td><td>Copy mode adaptive compression (ext / entropy / size gates + random)</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>10</td><td><code>_test_range_params.py</code></td><td>Range CTR full coverage (percent 1–99% / b/c combos / start/end offsets)</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>11</td><td><code>_test_middle_size.py</code></td><td>encrypt_middle_size matrix (1 KB–100 MB / boundary / clip / combos)</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>12</td><td><code>_test_inplace_combos.py</code></td><td>In-place full combination matrix (48 combos × 3 files, with timing top-10)</td><td>144</td><td style="color:var(--green)">144</td><td>0</td></tr>
+        <tr><td>13</td><td><code>_test_inplace_random.py</code></td><td>In-place randomized round-trips (100 runs, extended middle_size pool)</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>14</td><td><code>_test_inplace_range_params.py</code></td><td>In-place Range CTR full coverage (auto percent / manual b/c / start/end offsets)</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>15</td><td><code>_test_inplace_middle_size.py</code></td><td>In-place encrypt_middle_size matrix (sweep / boundary / clip / middle+tail / middle+range)</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>16</td><td><code>_test_inplace_boundary_ext.py</code></td><td>In-place boundary ext (auto percent edges / tail silent-clamp / scrypt combos)</td><td>53</td><td style="color:var(--green)">53</td><td>0</td></tr>
+        <tr><td>17</td><td><code>_test_inplace_full_random.py</code></td><td>In-place full random (500 runs, all params random, SEED=20260420)</td><td>500</td><td style="color:var(--green)">500</td><td>0</td></tr>
+        <tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="3">Total</td><td>2187</td><td style="color:var(--green)">2187</td><td>0</td></tr>
       </tbody>
     </table>
-    <div class="note-box" style="margin-top:14px">All 890 runs passed — <strong>zero failures</strong>. Coverage includes: fixed combination matrix, fully randomized parameters, boundary values, error injection, mode equivalence and folder operations.</div>
+    <div class="note-box" style="margin-top:14px">All 2187 runs passed — <strong>zero failures</strong>. Coverage includes: copy/in-place full combination matrices, fully randomized parameters, 500 in-place full-random runs, boundary values &amp; silent-clamp verification, error injection, mode equivalence, folder operations, compression gates, Range CTR full parameter sweep and Middle CTR size matrix.</div>
   </div>
 </div>
 
@@ -1337,6 +1483,87 @@ python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
 
     <h3 style="color:var(--blue);margin:20px 0 12px">Suite 8 — 模式等效性（100 次）</h3>
     <p>20 個固定 + 80 個隨機：對同一來源同時以 warp_file（Copy）與 warp_file_inplace（In-place）加密，解密後驗證兩者 SHA-256 均與原始一致。</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 9 — 自適應壓縮 Copy 模式（100 次）</h3>
+    <p>40 個固定 + 60 個隨機，涵蓋：</p>
+    <ul>
+      <li><strong>A（12）</strong>：compress=True + 可壓縮 .txt × 2 KDF × 2 tail × 2 middle</li>
+      <li><strong>B（4）</strong>：compress=True + Range CTR 開啟</li>
+      <li><strong>C（8）</strong>：副檔名關卡（.mp4）與熵值關卡（os.urandom 隨機位元組）— 壓縮被略過但加密正常完成</li>
+      <li><strong>D（6）</strong>：compress_max_bytes 大小關卡：小於 / 大於 / 0（無限制）</li>
+      <li><strong>E（4）</strong>：自訂 compress_skip_exts（{.txt}、{}、{.py,.zip}）</li>
+      <li><strong>F（6）</strong>：compress=False 基準測試（txt / mp4 / random bytes）</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 10 — Range CTR 參數完整覆蓋（100 次）</h3>
+    <p>40 個固定 + 60 個隨機，涵蓋：</p>
+    <ul>
+      <li><strong>A（14）</strong>：Auto 模式 percent 掃描 1/5/10/25/50/75/99% × small + medium 檔案</li>
+      <li><strong>B（12）</strong>：Manual 模式 6 個新 b/c 組合（b=c=16、b16c32、b128c256、b=c=256、b16c4096…）× 2 檔案</li>
+      <li><strong>C（8）</strong>：range_start &gt; 0 局部視窗（512B / ENCRYPT_SIZE / file/4 / file/2 / start&gt;file）</li>
+      <li><strong>D（6）</strong>：range_end &gt; 0 上界視窗 × small + medium</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 11 — encrypt_middle_size 矩陣（100 次）</h3>
+    <p>40 個固定 + 60 個隨機，涵蓋：</p>
+    <ul>
+      <li><strong>A（14）</strong>：middle_size 掃描 1KB / 4KB / 16KB / 64KB / 256KB / 512KB / 2MB × small + medium 檔案</li>
+      <li><strong>B（8）</strong>：邊界合成檔案（gap=0、gap=1KB、3072B、4096B 搭配各種 tail / middle_size）</li>
+      <li><strong>C（6）</strong>：超大 middle_size（10MB / 50MB / 100MB）截斷至 gap — 驗證 clamp 邏輯</li>
+      <li><strong>D（6）</strong>：middle_size + encrypt_tail=True × 3 大小 × 2 檔案</li>
+      <li><strong>E（6）</strong>：middle_size + encrypt_range=True × 2 大小 × 3 來源</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 12 — In-place 全組合矩陣（144 次）</h3>
+    <p>2 KDF × 2 tail × 2 middle × 6 range = 48 組合 × 3 檔案大小，對所有排列執行 warp_file_inplace → unwarp_auto → SHA-256。每次計時，列印 top-10 最慢記錄。</p>
+    <table>
+      <thead><tr><th>維度</th><th>選項</th></tr></thead>
+      <tbody>
+        <tr><td>KDF</td><td>scrypt、sha256</td></tr>
+        <tr><td>encrypt_tail</td><td>False、True</td></tr>
+        <tr><td>encrypt_middle</td><td>False、True</td></tr>
+        <tr><td>Range CTR</td><td>none、auto-25%、auto-50%、manual b16/c64、manual b32/c128、manual b512/c512</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 13 — In-place 隨機往返（100 次）</h3>
+    <p>完全隨機：KDF、encrypt_size、tail、middle、middle_size（包含大池至 ENCRYPT_MIDDLE_SIZE）、range 模式與參數。列印 top-10 最慢記錄。</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 14 — In-place Range CTR 參數完整覆蓋（100 次）</h3>
+    <p>40 個固定 + 60 個隨機，涵蓋：</p>
+    <ul>
+      <li><strong>A（14）</strong>：Auto 模式 percent 掃描 1/5/10/25/50/75/99% × small + medium 檔案</li>
+      <li><strong>B（12）</strong>：Manual 模式 6 個新 b/c 組合 × 2 檔案</li>
+      <li><strong>C（8）</strong>：range_start &gt; 0 局部視窗（512B / ENCRYPT_SIZE / file/4 / file/2 / start&gt;file 無操作）</li>
+      <li><strong>D（6）</strong>：range_end &gt; 0 上界視窗 × small + medium</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 15 — In-place encrypt_middle_size 矩陣（100 次）</h3>
+    <p>40 個固定 + 60 個隨機，涵蓋：</p>
+    <ul>
+      <li><strong>A（14）</strong>：middle_size 掃描 × small + medium 檔案</li>
+      <li><strong>B（8）</strong>：邊界大小（0、1、16、MAX、2×MAX 截斷）× small/medium/large</li>
+      <li><strong>C（6）</strong>：超大 middle_size 截斷驗證</li>
+      <li><strong>D（6）</strong>：middle + tail 組合</li>
+      <li><strong>E（6）</strong>：middle + range 組合</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 16 — In-place 邊界擴充（53 次）</h3>
+    <p>53 個固定案例，涵蓋：</p>
+    <ul>
+      <li><strong>A（20）</strong>：range_mode=auto + percent 邊界值 {0,1,50,99,100}；種化 range_start==range_end 與 start&gt;file 無操作驗證</li>
+      <li><strong>B（23）</strong>：encrypt_tail 靜默截斷驗證（file &lt; 2×encrypt_size 時 tail 靜默失效，但結果必須為 OK）</li>
+      <li><strong>C（10）</strong>：kdf=KDF_SCRYPT × {plain、tail、middle、mid+tail、range-25%} × small + medium</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 17 — In-place 全隨機（500 次）</h3>
+    <p>SEED=20260420，KDF 權重 SHA-256 4:1 scrypt。所有參數均從池中隨機選取：</p>
+    <ul>
+      <li>KDF、encrypt_size（0–ENCRYPT_SIZE×2）、tail、middle、middle_size（至 4MB）</li>
+      <li>encrypt_range（開/關）、range_mode、range_percent 0–100、b/c 組合（確保 c≥b、c≠0）</li>
+      <li>range_start / range_end 隨機位元組偏移</li>
+      <li>SKIP 結果（檔案太小）計入 PASS</li>
+    </ul>
   </div>
   <div class="en">
     <h3 style="color:var(--blue);margin:0 0 12px">Suite 1 — Copy Mode Full Matrix (144 runs)</h3>
@@ -1378,6 +1605,87 @@ python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
 
     <h3 style="color:var(--blue);margin:20px 0 12px">Suite 8 — Mode Equivalence (100 runs)</h3>
     <p>20 fixed + 80 random: encrypt the same source with both warp_file (copy) and warp_file_inplace (in-place), verify both decrypted outputs match the original SHA-256.</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 9 — Adaptive Compression Copy Mode (100 runs)</h3>
+    <p>40 fixed + 60 random, covering:</p>
+    <ul>
+      <li><strong>A (12)</strong>: compress=True + compressible .txt × 2 KDF × 2 tail × 2 middle</li>
+      <li><strong>B (4)</strong>: compress=True + Range CTR enabled</li>
+      <li><strong>C (8)</strong>: Extension gate (.mp4) and entropy gate (os.urandom bytes) — compression skipped but encryption completes normally</li>
+      <li><strong>D (6)</strong>: compress_max_bytes size gate: below / above / 0 (unlimited)</li>
+      <li><strong>E (4)</strong>: Custom compress_skip_exts ({.txt}, {}, {.py,.zip})</li>
+      <li><strong>F (6)</strong>: compress=False baseline (txt / mp4 / random bytes)</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 10 — Range CTR Full Parameter Coverage (100 runs)</h3>
+    <p>40 fixed + 60 random, covering:</p>
+    <ul>
+      <li><strong>A (14)</strong>: Auto mode percent sweep 1/5/10/25/50/75/99% × small + medium files</li>
+      <li><strong>B (12)</strong>: Manual mode 6 new b/c combos (b=c=16, b16c32, b128c256, b=c=256, b16c4096…) × 2 files</li>
+      <li><strong>C (8)</strong>: range_start &gt; 0 partial windows (512B / ENCRYPT_SIZE / file/4 / file/2 / start&gt;file)</li>
+      <li><strong>D (6)</strong>: range_end &gt; 0 upper-bounded windows × small + medium</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 11 — encrypt_middle_size Matrix (100 runs)</h3>
+    <p>40 fixed + 60 random, covering:</p>
+    <ul>
+      <li><strong>A (14)</strong>: middle_size sweep 1KB / 4KB / 16KB / 64KB / 256KB / 512KB / 2MB × small + medium files</li>
+      <li><strong>B (8)</strong>: Boundary synthetic files (gap=0, gap=1KB, 3072B, 4096B with various tail / middle_size combos)</li>
+      <li><strong>C (6)</strong>: Oversized middle_size (10MB / 50MB / 100MB) clips to gap — validates clamp logic</li>
+      <li><strong>D (6)</strong>: middle_size + encrypt_tail=True × 3 sizes × 2 files</li>
+      <li><strong>E (6)</strong>: middle_size + encrypt_range=True × 2 sizes × 3 sources</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 12 — In-place Full Combination Matrix (144 runs)</h3>
+    <p>2 KDF × 2 tail × 2 middle × 6 range = 48 combos × 3 file sizes; warp_file_inplace → unwarp_auto → SHA-256. Per-run timing, top-10 leaderboard printed at end.</p>
+    <table>
+      <thead><tr><th>Dimension</th><th>Options</th></tr></thead>
+      <tbody>
+        <tr><td>KDF</td><td>scrypt, sha256</td></tr>
+        <tr><td>encrypt_tail</td><td>False, True</td></tr>
+        <tr><td>encrypt_middle</td><td>False, True</td></tr>
+        <tr><td>Range CTR</td><td>none, auto-25%, auto-50%, manual b16/c64, manual b32/c128, manual b512/c512</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 13 — In-place Randomized Round-trips (100 runs)</h3>
+    <p>Fully randomized: KDF, encrypt_size, tail, middle, middle_size (extended pool up to ENCRYPT_MIDDLE_SIZE), range mode and parameters. Top-10 timing leaderboard printed at end.</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 14 — In-place Range CTR Full Coverage (100 runs)</h3>
+    <p>40 fixed + 60 random, covering:</p>
+    <ul>
+      <li><strong>A (14)</strong>: Auto mode percent sweep 1/5/10/25/50/75/99% × small + medium files</li>
+      <li><strong>B (12)</strong>: Manual mode 6 new b/c combos × 2 files</li>
+      <li><strong>C (8)</strong>: range_start &gt; 0 partial windows (512B / ENCRYPT_SIZE / file/4 / file/2 / start&gt;file no-op)</li>
+      <li><strong>D (6)</strong>: range_end &gt; 0 upper-bounded windows × small + medium</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 15 — In-place encrypt_middle_size Matrix (100 runs)</h3>
+    <p>40 fixed + 60 random, covering:</p>
+    <ul>
+      <li><strong>A (14)</strong>: middle_size sweep × small + medium files</li>
+      <li><strong>B (8)</strong>: Boundary sizes (0, 1, 16, MAX, 2×MAX clip) × small/medium/large</li>
+      <li><strong>C (6)</strong>: Oversized middle_size clip validation</li>
+      <li><strong>D (6)</strong>: middle + tail combos</li>
+      <li><strong>E (6)</strong>: middle + range combos</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 16 — In-place Boundary Extension (53 runs)</h3>
+    <p>53 fixed cases, covering:</p>
+    <ul>
+      <li><strong>A (20)</strong>: range_mode=auto + boundary percents {0,1,50,99,100}; degenerate windows (range_start==range_end, start&gt;file) verified as no-ops</li>
+      <li><strong>B (23)</strong>: encrypt_tail silent-clamp verification: when file &lt; 2×encrypt_size the tail is silently dropped but result must be OK (not SKIP/error); round-trip SHA-256 verified</li>
+      <li><strong>C (10)</strong>: kdf=KDF_SCRYPT × {plain, tail, middle, mid+tail, range-25%} × small + medium</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 17 — In-place Full Random (500 runs)</h3>
+    <p>SEED=20260420, KDF weight SHA-256 4:1 scrypt. All parameters randomly selected from pools:</p>
+    <ul>
+      <li>KDF, encrypt_size (0–ENCRYPT_SIZE×2), tail, middle, middle_size (up to 4MB)</li>
+      <li>encrypt_range (on/off), range_mode, range_percent 0–100, b/c combos (c≥b, c≠0)</li>
+      <li>range_start / range_end random offsets within file bounds</li>
+      <li>SKIP results (file too small) counted as PASS</li>
+    </ul>
   </div>
 </div>
 
