@@ -86,8 +86,6 @@ _DEFAULTS: dict = {
     "last_folder": "",
     "encrypt_size": 1024,
     "encrypt_all": False,
-    "password_enhancement": False,
-    "enhancement_warning_shown": False,
     "after_decrypt": "auto",   # "auto" | "confirm" | "folder"
     "keep_encrypted": False,
     "theme": "Dark",
@@ -424,12 +422,6 @@ def _range_resolve_bc(b_val: int, c_val: int, unit: str, range_size: int) -> tup
     return b_bytes, c_bytes
 
 
-# ── Password Enhancement ───────────────────────────────────────────────────
-
-# Cache for auto-passwords to avoid regeneration
-_auto_password_cache = {}
-_auto_password_lock = threading.Lock()
-
 def _generate_auto_password(filepath: Path) -> str:
     """Generate content-based auto-password from file properties.
     
@@ -450,18 +442,9 @@ def _generate_auto_password(filepath: Path) -> str:
         - Same file always produces same password
         - Different files produce different passwords
     """
-    # Cache key based on path and modification time for performance
     try:
         stat = filepath.stat()
-        cache_key = (str(filepath), stat.st_size, stat.st_mtime_ns)
-        
-        # Check cache first
-        with _auto_password_lock:
-            if cache_key in _auto_password_cache:
-                return _auto_password_cache[cache_key]
-        
         import base64
-        
         file_size = struct.pack("<Q", stat.st_size)
         
         # Optimized content fingerprinting with minimal I/O
@@ -492,68 +475,12 @@ def _generate_auto_password(filepath: Path) -> str:
         # Simple encoding
         encoded = base64.b64encode(strengthened).decode()[:24].ljust(24, 'A')
         
-        # Cache result (limit cache size to prevent memory growth)
-        with _auto_password_lock:
-            if len(_auto_password_cache) < 1000:
-                _auto_password_cache[cache_key] = encoded
-        
         return encoded
-        
+
     except Exception:
-        # Fallback to simple hash if auto-generation fails
         import base64
         fallback_data = str(filepath).encode()
         return base64.b64encode(hashlib.sha256(fallback_data).digest()).decode()[:24]
-
-
-def _generate_hybrid_password(user_password: str, filepath: Path) -> str:
-    """Generate hybrid password mixing user input with file fingerprint.
-    
-    Args:
-        user_password: User-provided password.
-        filepath: Path to file being encrypted.
-        
-    Returns:
-        Strong hybrid password (43 characters if user password provided).
-        
-    Example:
-        >>> hybrid = _generate_hybrid_password("hello", Path("file.txt"))
-        >>> len(hybrid)
-        43
-        
-    Security:
-        - Combines user entropy with file-specific entropy
-        - HMAC-based mixing prevents simple separation
-        - Short user passwords become cryptographically strong
-    """
-    try:
-        import base64
-        import hmac
-        
-        if not user_password:  # Pure auto mode
-            return _generate_auto_password(filepath)
-        
-        # Generate auto component
-        auto_password = _generate_auto_password(filepath)
-        
-        # Normalize inputs
-        user_bytes = user_password.encode('utf-8')[:64]  # Limit length
-        auto_bytes = auto_password.encode('utf-8')[:32]
-        
-        # Bidirectional HMAC mixing
-        mix_forward = hmac.new(user_bytes, auto_bytes, hashlib.sha256).digest()   # 32 bytes
-        mix_reverse = hmac.new(auto_bytes, user_bytes, hashlib.sha256).digest()   # 32 bytes
-        combined = mix_forward + mix_reverse  # 64 bytes total
-        
-        # Final encoding  
-        final_b64 = base64.b64encode(combined)
-        final_password = final_b64.decode()[:43]  # ~43 chars for 64 bytes
-        
-        return final_password
-        
-    except Exception as e:
-        # Fallback to user password only if hybrid generation fails
-        return user_password
 
 
 # ── File Format Constants ──────────────────────────────────────────────────

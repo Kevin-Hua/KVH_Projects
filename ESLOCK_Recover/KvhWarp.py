@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 """KvhWarp - GUI entry point.
 All crypto/warp logic lives in kvhwarp_core; this module handles UI only.
 """
@@ -26,7 +26,7 @@ from kvhwarp_core import (  # noqa: F401
     unwarp_auto,
     rename_subfolders, restore_subfolders, cleanup_empty_dirs,
     _load_opts, _save_opts,
-    _range_resolve_bc, _generate_hybrid_password, _skip_exts_from_opts,
+    _range_resolve_bc, _skip_exts_from_opts,
 )
 
 
@@ -529,7 +529,6 @@ class App(tk.Tk):
         self._var_pw      = tk.StringVar()
         self._var_scrypt  = tk.BooleanVar(value=True)
         self._var_inplace = tk.BooleanVar(value=True)
-        self._var_enhance = tk.BooleanVar(value=self.opts.get("password_enhancement", False))
         self._var_enc     = tk.IntVar(value=self.opts.get("encrypt_size", ENCRYPT_SIZE))
         self._var_tail    = tk.BooleanVar(value=self.opts.get("encrypt_tail", False))
         self._var_enc_all     = tk.BooleanVar(value=self.opts.get("encrypt_all", False))
@@ -608,11 +607,6 @@ class App(tk.Tk):
                  bg=BG, fg="#888888").pack(side=tk.LEFT)
         # Set initial state
         self._on_inplace_toggle()
-
-        # ── Enhancement option row ──
-        row_enhance = tk.Frame(outer, bg=BG)
-        row_enhance.pack(fill=tk.X, pady=(0, 12))
-        tk.Checkbutton(row_enhance, text="[+] Enable password enhancement (mixes with file fingerprint)", variable=self._var_enhance, font=("Segoe UI", 9), bg=BG, fg=FG, activebackground=BG, activeforeground=CYAN, selectcolor=BG_PANEL, command=self._on_enhancement_toggle).pack(side=tk.LEFT)
 
         # ── Encrypt size row ──
         row_enc = tk.Frame(outer, bg=BG)
@@ -861,43 +855,6 @@ class App(tk.Tk):
         self.opts["encrypt_all"] = self._var_enc_all.get()
         _save_opts(self.opts)
 
-    def _on_enhancement_toggle(self):
-        """Handle password enhancement checkbox toggle with warning dialog."""
-        if self._var_enhance.get():  # Being enabled
-            if not self.opts.get("enhancement_warning_shown", False):
-                # Show warning dialog
-                from tkinter import messagebox
-                warning_text = """Password Enhancement
-
-This feature strengthens your passwords by mixing them with file-specific data.
-
-Benefits:
-  - Much stronger security
-  - Same password, better protection
-
-Important:
-  - Files encrypted with this enabled require it enabled to decrypt
-  - Not compatible with older versions
-
-Continue enabling password enhancement?"""
-                
-                result = messagebox.askyesno("Password Enhancement", warning_text, parent=self)
-                if not result:
-                    # User cancelled, revert checkbox
-                    self._var_enhance.set(False)
-                    return
-                
-                # User confirmed, don't show warning again
-                self.opts["enhancement_warning_shown"] = True
-                _save_opts(self.opts)
-            
-            # Update settings
-            self.opts["password_enhancement"] = True
-            _save_opts(self.opts)
-        else:  # Being disabled
-            self.opts["password_enhancement"] = False
-            _save_opts(self.opts)
-
     def _log_msg(self, msg: str):
         self._log.configure(state=tk.NORMAL)
         self._log.insert(tk.END, msg + "\n")
@@ -974,14 +931,12 @@ Continue enabling password enhancement?"""
             self.opts["compress_max_mb"] = self._var_compress_mb.get()
             _save_opts(self.opts)
 
-        enhance = self.opts.get("password_enhancement", False)
-
         def _run():
             for f in files:
                 try:
                     file_enc_size = f.stat().st_size if encrypt_all else enc_size
                     file_use_tail = False if encrypt_all else use_tail
-                    eff_pw = _generate_hybrid_password(pw, f) if enhance else pw
+                    eff_pw = pw
                     if use_inplace:
                         result = warp_fn(
                             f, eff_pw,
@@ -1050,12 +1005,10 @@ Continue enabling password enhancement?"""
         self._btn_unwarp.configure(state=tk.DISABLED)
         self._log_msg(f"── Unwarp: {count} file(s) ──")
         t0 = time.perf_counter()
-        enhance = self.opts.get("password_enhancement", False)
         def _run():
             for f in files:
-                eff_pw = _generate_hybrid_password(pw, f) if enhance else pw
                 try:
-                    result = unwarp_auto(f, eff_pw, base_folder=folder)
+                    result = unwarp_auto(f, pw, base_folder=folder)
                 except Exception as e:
                     result = f"ERR: {f.name} - {e}"
                 self.after(0, self._log_msg, result)
