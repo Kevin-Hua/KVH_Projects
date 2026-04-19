@@ -71,7 +71,7 @@ def cmd_warp(args: argparse.Namespace) -> int:
         f for f in folder.rglob("*")
         if f.is_file()
         and f.suffix.lower() != KS_EXT
-        and (f.stat().st_size > 0 if encrypt_all else f.stat().st_size >= MIN_FILE_SIZE)
+        and f.stat().st_size > 0
     ]
     if not files:
         print("No eligible files found.")

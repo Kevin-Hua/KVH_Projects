@@ -1562,7 +1562,7 @@ python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
       <li>KDF、encrypt_size（0–ENCRYPT_SIZE×2）、tail、middle、middle_size（至 4MB）</li>
       <li>encrypt_range（開/關）、range_mode、range_percent 0–100、b/c 組合（確保 c≥b、c≠0）</li>
       <li>range_start / range_end 隨機位元組偏移</li>
-      <li>SKIP 結果（檔案太小）計入 PASS</li>
+      <li>SKIP 結果（空檔案）計入 PASS</li>
     </ul>
   </div>
   <div class="en">
@@ -1598,7 +1598,7 @@ python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
     </ul>
 
     <h3 style="color:var(--blue);margin:20px 0 12px">Suite 6 — Boundary Values (100 runs)</h3>
-    <p>Includes: MIN_FILE_SIZE (1024 B), encrypt_size = file_size, range_b_bytes = range_c_bytes (100% coverage), range_start = file_size − 1 and other extremes.</p>
+    <p>Includes: encrypt_size = file_size, range_b_bytes = range_c_bytes (100% coverage), range_start = file_size − 1 and other extremes. Small files (1 B–1023 B) now warp correctly — MIN_FILE_SIZE restriction removed.</p>
 
     <h3 style="color:var(--blue);margin:20px 0 12px">Suite 7 — Folder Functions (100 runs)</h3>
     <p>30 fixed + 70 random: rename_subfolders / restore_subfolders / cleanup_empty_subfolders across various folder structures.</p>
@@ -1684,7 +1684,6 @@ python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
       <li>KDF, encrypt_size (0–ENCRYPT_SIZE×2), tail, middle, middle_size (up to 4MB)</li>
       <li>encrypt_range (on/off), range_mode, range_percent 0–100, b/c combos (c≥b, c≠0)</li>
       <li>range_start / range_end random offsets within file bounds</li>
-      <li>SKIP results (file too small) counted as PASS</li>
     </ul>
   </div>
 </div>

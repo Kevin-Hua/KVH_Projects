@@ -785,8 +785,6 @@ def warp_file(
         file_size = filepath.stat().st_size
         if file_size == 0:
             return f"SKIP: {filepath.name} (empty)"
-        if file_size < MIN_FILE_SIZE and encrypt_size > file_size:
-            return f"SKIP: {filepath.name} (too small)"
 
         file_size_mb = file_size / (1024 * 1024)
         orig_mtime   = os.path.getmtime(filepath)
@@ -986,8 +984,6 @@ def warp_file_inplace(
         file_size = filepath.stat().st_size
         if file_size == 0:
             return f"SKIP: {filepath.name} (empty)"
-        if file_size < MIN_FILE_SIZE and encrypt_size > file_size:
-            return f"SKIP: {filepath.name} (too small)"
 
         file_size_mb     = file_size / (1024 * 1024)
         orig_size        = file_size

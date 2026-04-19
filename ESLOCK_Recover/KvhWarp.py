@@ -884,7 +884,7 @@ class App(tk.Tk):
         self.opts["encrypt_all"] = encrypt_all
         _save_opts(self.opts)
         head_label = "ALL" if encrypt_all else f"{enc_size}B"
-        files = [f for f in folder.rglob("*") if f.is_file() and f.suffix.lower() != KS_EXT and (f.stat().st_size > 0 if encrypt_all else f.stat().st_size >= MIN_FILE_SIZE)]
+        files = [f for f in folder.rglob("*") if f.is_file() and f.suffix.lower() != KS_EXT and f.stat().st_size > 0]
         if not files:
             self._log_msg("No eligible files found.")
             return
