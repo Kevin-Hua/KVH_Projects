@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KvhWarp — Technical Whitepaper</title>
+<link rel="stylesheet" href="index.css">
+</head>
+
+<body style="background:#060c18;color:#e5e7eb">
+
+<div class="lang-switch">
+  <button id="btn-zh" class="active" onclick="setLang('zh')">中文</button>
+  <button id="btn-en" onclick="setLang('en')">English</button>
+</div>
+
+<div class="wrapper">
+
+<nav>
+  <h3>📑 <span class="zhi">目錄</span><span class="eni">Contents</span></h3>
+  <a href="#overview">      <span class="zhi">概覽</span>              <span class="eni">Overview</span></a>
+  <a href="#format">        <span class="zhi">檔案格式</span>          <span class="eni">File Format</span></a>
+  <a href="#algorithms">    <span class="zhi">加密演算法</span>        <span class="eni">Algorithms</span></a>
+  <a href="#layers">        <span class="zhi">加密層次</span>          <span class="eni">Encryption Layers</span></a>
+  <a href="#range-ctr">     <span class="zhi">Range CTR</span>         <span class="eni">Range CTR</span></a>
+  <a href="#flowchart">     <span class="zhi">加密流程圖</span>        <span class="eni">Encrypt Flowchart</span></a>
+  <a href="#decrypt-flow">  <span class="zhi">解密流程圖</span>        <span class="eni">Decrypt Flowchart</span></a>
+  <a href="#options">       <span class="zhi">選項說明</span>          <span class="eni">Options</span></a>
+  <a href="#cli">           <span class="zhi">CLI 用法</span>           <span class="eni">CLI Usage</span></a>
+  <a href="#examples">      <span class="zhi">使用範例</span>          <span class="eni">Examples</span></a>
+  <a href="#security">      <span class="zhi">安全分析</span>          <span class="eni">Security</span></a>
+  <a href="#limits">        <span class="zhi">限制與風險</span>        <span class="eni">Limitations</span></a>
+  <a href="#test-results"> <span class="zhi">測試結果（8 套件）</span>  <span class="eni">Test Results (8 Suites)</span></a>
+</nav>
+
+<main>
+
+<!-- ===== Overview ===== -->
+<section id="overview">
+<div class="icon-title">🔐 KvhWarp <span class="zhi">技術白皮書</span><span class="eni">Technical Whitepaper</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh">
+    <p>KvhWarp 是一個多層次檔案隱匿加密工具，專為<strong>速度</strong>與<strong>視覺匿蹤</strong>設計。</p>
+    <ul>
+      <li>AES-256-GCM 認證加密（頭 / 尾）</li>
+      <li>AES-256-CTR 中段（Center Middle）與 B/C 步進 Range CTR</li>
+      <li>v2 格式：所有 magic / salt / metadata 均以密碼派生遮罩 XOR 混淆</li>
+      <li>支援 <strong>Copy 模式</strong>（.ks 副本）與 <strong>In-place 模式</strong>（原地加密）</li>
+      <li>KDF：scrypt（建議）或 SHA-256（快速）</li>
+    </ul>
+    <p>加密後的檔案以亂數時間戳命名（<code>1745000000000000000.ks</code>），原始檔名、大小與時間戳均加密存於 metadata 中。</p>
+  </div>
+  <div class="en">
+    <p>KvhWarp is a multi-layer file stealth-encryption tool designed for <strong>speed</strong> and <strong>visual concealment</strong>.</p>
+    <ul>
+      <li>AES-256-GCM authenticated encryption (head / tail)</li>
+      <li>AES-256-CTR for center middle and B/C-stride Range CTR</li>
+      <li>v2 format: all magic / salt / metadata XOR-masked with a password-derived mask</li>
+      <li>Supports <strong>Copy mode</strong> (.ks copy) and <strong>In-place mode</strong> (encrypt original)</li>
+      <li>KDF: scrypt (recommended) or SHA-256 (fast)</li>
+    </ul>
+    <p>Encrypted files are renamed to random nanosecond timestamps (<code>1745000000000000000.ks</code>). Original filename, size and timestamps are stored encrypted inside the metadata.</p>
+  </div>
+</div>
+</section>
+
+<!-- ===== File Format ===== -->
+<section id="format">
+<div class="icon-title">📦 <span class="zhi">檔案格式</span><span class="eni">File Format</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <!-- ── Copy mode ── -->
+  <p style="margin:0 0 8px;font-size:.9rem;color:var(--yellow);font-weight:700">
+    <span class="zhi">▶ Copy 模式（.ks 副本）</span><span class="eni">▶ Copy Mode (.ks copy)</span>
+  </p>
+  <pre>enc_magic(4B)  ← KWRP XOR SHA256(pw)[0:4]
+enc_salt_off(1B)
+salt_prefix(0–14B)
+enc_meta_off(1B)
+enc_meta_prefix(var)
+salt_suffix(var)
+meta_enc_len(4B, LE)
+enc_meta_suffix(var)
+─────────────────── header end ───────────────────
+enc_head_blob    ← AES-256-GCM nonce(12)+tag(16)+ct
+[plain/CTR middle gap]  ← optional Middle CTR + Range CTR
+[enc_tail_blob]  ← AES-256-GCM (optional)</pre>
+
+  <p style="margin:20px 0 8px;font-size:.9rem;color:var(--yellow);font-weight:700">
+    <span class="zhi">▶ In-place 模式（Footer 附加）</span><span class="eni">▶ In-place Mode (footer appended)</span>
+  </p>
+  <pre>─────────── file content (modified in-place) ──────────
+enc_head         ← AES-256-GCM ct overwrites head
+[CTR middle]     ← optional
+[Range CTR]      ← optional
+[enc_tail]       ← optional
+─────────────────── footer ────────────────────────────
+enc_meta(var)
+meta_enc_len(4B, LE)
+masked_salt(16B)   ← salt XOR SHA256(pw)[6:22]
+head_nonce(12B)
+head_tag(16B)
+enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
+
+  <!-- ── Copy mode SVG ── -->
+  <p style="margin:24px 0 10px;font-size:.9rem;color:var(--muted)">
+    <span class="zhi">▼ Copy 模式檔案佈局（比例示意）</span>
+    <span class="eni">▼ Copy mode file layout (proportional)</span>
+  </p>
+  <svg id="svgCopyFormat" viewBox="0 0 860 240" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arr1" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L7,3 z" fill="#60a5fa"/>
+      </marker>
+    </defs>
+
+    <!-- Row 1: obfuscated header -->
+    <text x="0" y="14" font-family="system-ui" font-size="11" fill="#facc15">
+      <tspan class="zhi">● 混淆 Header（密碼 XOR 遮罩）</tspan><tspan class="eni">● Obfuscated Header (password XOR mask)</tspan>
+    </text>
+    <!-- enc_magic 4B -->
+    <rect x="0"   y="18" width="40"  height="44" fill="#100a22" stroke="#a78bfa" stroke-width="1.3"/>
+    <text x="20"  y="36" font-family="system-ui" font-size="9"  fill="#a78bfa" text-anchor="middle">enc</text>
+    <text x="20"  y="49" font-family="system-ui" font-size="9"  fill="#a78bfa" text-anchor="middle">magic</text>
+    <text x="20"  y="58" font-family="system-ui" font-size="8"  fill="#9aa4b2" text-anchor="middle">4B</text>
+    <!-- salt_off 1B -->
+    <rect x="40"  y="18" width="20"  height="44" fill="#100a22" stroke="#a78bfa" stroke-width="1.3"/>
+    <text x="50"  y="40" font-family="system-ui" font-size="8"  fill="#a78bfa" text-anchor="middle">salt</text>
+    <text x="50"  y="52" font-family="system-ui" font-size="8"  fill="#a78bfa" text-anchor="middle">off</text>
+    <text x="50"  y="60" font-family="system-ui" font-size="7"  fill="#9aa4b2" text-anchor="middle">1B</text>
+    <!-- salt prefix/suffix interleaved with meta -->
+    <rect x="60"  y="18" width="100" height="44" fill="#0a1f10" stroke="#34d399" stroke-width="1.3"/>
+    <text x="110" y="36" font-family="system-ui" font-size="9"  fill="#34d399" text-anchor="middle">salt_prefix</text>
+    <text x="110" y="49" font-family="system-ui" font-size="8"  fill="#9aa4b2" text-anchor="middle">0–14B</text>
+    <!-- enc_meta_off 1B -->
+    <rect x="160" y="18" width="20"  height="44" fill="#100a22" stroke="#a78bfa" stroke-width="1.3"/>
+    <text x="170" y="40" font-family="system-ui" font-size="8"  fill="#a78bfa" text-anchor="middle">meta</text>
+    <text x="170" y="52" font-family="system-ui" font-size="8"  fill="#a78bfa" text-anchor="middle">off</text>
+    <text x="170" y="60" font-family="system-ui" font-size="7"  fill="#9aa4b2" text-anchor="middle">1B</text>
+    <!-- enc_meta interleaved -->
+    <rect x="180" y="18" width="200" height="44" fill="#1a0a0a" stroke="#f87171" stroke-width="1.3"/>
+    <text x="280" y="36" font-family="system-ui" font-size="10" fill="#f87171" text-anchor="middle">enc_meta (interleaved)</text>
+    <text x="280" y="52" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">AES-GCM encrypted JSON metadata</text>
+    <!-- meta_enc_len -->
+    <rect x="380" y="18" width="40"  height="44" fill="#0a1020" stroke="#60a5fa" stroke-width="1.3"/>
+    <text x="400" y="37" font-family="system-ui" font-size="8"  fill="#60a5fa" text-anchor="middle">meta</text>
+    <text x="400" y="49" font-family="system-ui" font-size="8"  fill="#60a5fa" text-anchor="middle">len</text>
+    <text x="400" y="58" font-family="system-ui" font-size="7"  fill="#9aa4b2" text-anchor="middle">4B LE</text>
+
+    <!-- Row 2: payload -->
+    <text x="0" y="84" font-family="system-ui" font-size="11" fill="#facc15">
+      <tspan class="zhi">● 加密負載</tspan><tspan class="eni">● Encrypted Payload</tspan>
+    </text>
+    <!-- enc_head_blob -->
+    <rect x="0"   y="90" width="130" height="56" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="65"  y="113" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">enc_head_blob</text>
+    <text x="65"  y="129" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">GCM: nonce(12)+tag(16)+ct</text>
+    <text x="65"  y="142" font-family="system-ui" font-size="9"  fill="#60a5fa" text-anchor="middle">🔒 AES-256-GCM</text>
+
+    <!-- middle gap -->
+    <rect x="130" y="90" width="480" height="56" fill="#0d1520" stroke="#475569" stroke-width="1.5"/>
+    <text x="370" y="111" font-family="system-ui" font-size="12" fill="#64748b" text-anchor="middle">Middle Gap</text>
+    <text x="370" y="127" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">明文 / Middle CTR（中央錨定）/ Range CTR（步進）</tspan>
+      <tspan class="eni">Plaintext / Middle CTR (center-anchored) / Range CTR (stride)</tspan>
+    </text>
+    <text x="370" y="141" font-family="system-ui" font-size="9"  fill="#475569" text-anchor="middle">
+      <tspan class="zhi">所有 CTR 層皆可疊加</tspan><tspan class="eni">All CTR layers composable</tspan>
+    </text>
+
+    <!-- enc_tail_blob (optional) -->
+    <rect x="610" y="90" width="130" height="56" fill="#1a1a2e" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="675" y="113" font-family="system-ui" font-size="10" fill="#a78bfa" text-anchor="middle">enc_tail_blob</text>
+    <text x="675" y="127" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">GCM (optional)</text>
+    <text x="675" y="141" font-family="system-ui" font-size="8"  fill="#a78bfa" text-anchor="middle">🔒 optional</text>
+
+    <!-- legend -->
+    <rect x="0"   y="165" width="12" height="12" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1"/>
+    <text x="17"  y="175" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">AES-256-GCM 認證加密</tspan><tspan class="eni">AES-256-GCM authenticated</tspan>
+    </text>
+    <rect x="220" y="165" width="12" height="12" fill="#100a22" stroke="#a78bfa" stroke-width="1"/>
+    <text x="237" y="175" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">密碼遮罩 XOR 混淆</tspan><tspan class="eni">password-mask XOR obfuscated</tspan>
+    </text>
+    <rect x="460" y="165" width="12" height="12" fill="#1a0a0a" stroke="#f87171" stroke-width="1"/>
+    <text x="477" y="175" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">AES-GCM 加密 JSON</tspan><tspan class="eni">AES-GCM encrypted JSON</tspan>
+    </text>
+    <rect x="0"   y="190" width="12" height="12" fill="#0d1520" stroke="#475569" stroke-width="1"/>
+    <text x="17"  y="200" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">可選 CTR 層（明文底座）</tspan><tspan class="eni">Optional CTR layers (plaintext base)</tspan>
+    </text>
+    <rect x="220" y="190" width="12" height="12" fill="#1a1a2e" stroke="#a78bfa" stroke-width="1" stroke-dasharray="3,2"/>
+    <text x="237" y="200" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">虛線 = 選用區塊</tspan><tspan class="eni">Dashed = optional block</tspan>
+    </text>
+  </svg>
+  <button class="btn" style="margin-top:8px" onclick="exportSVG('svgCopyFormat','kvhwarp_copy_format.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+
+  <!-- ── In-place mode SVG ── -->
+  <p style="margin:28px 0 10px;font-size:.9rem;color:var(--muted)">
+    <span class="zhi">▼ In-place 模式 — 修改後的檔案佈局（Footer 附加）</span>
+    <span class="eni">▼ In-place mode — modified file layout (footer appended)</span>
+  </p>
+  <svg id="svgInplaceFormat" viewBox="0 0 860 200" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <!-- enc head -->
+    <rect x="0"   y="10" width="120" height="56" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="60"  y="33" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">enc_head</text>
+    <text x="60"  y="49" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">GCM ct (in-place)</text>
+    <text x="60"  y="62" font-family="system-ui" font-size="9"  fill="#60a5fa" text-anchor="middle">🔒</text>
+    <!-- middle gap -->
+    <rect x="120" y="10" width="340" height="56" fill="#0d1520" stroke="#475569" stroke-width="1.5"/>
+    <text x="290" y="33" font-family="system-ui" font-size="11" fill="#64748b" text-anchor="middle">Middle Gap</text>
+    <text x="290" y="49" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">可選 Middle CTR + Range CTR</tspan><tspan class="eni">Optional Middle CTR + Range CTR</tspan>
+    </text>
+    <!-- enc tail optional -->
+    <rect x="460" y="10" width="120" height="56" fill="#1a1a2e" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <text x="520" y="33" font-family="system-ui" font-size="10" fill="#a78bfa" text-anchor="middle">enc_tail</text>
+    <text x="520" y="49" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">GCM (optional)</text>
+
+    <!-- footer connector -->
+    <line x1="580" y1="38" x2="590" y2="38" stroke="#34d399" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="590" y1="38" x2="590" y2="80" stroke="#34d399" stroke-width="1" stroke-dasharray="4,2"/>
+    <line x1="590" y1="80" x2="580" y2="80" stroke="#34d399" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arr1)"/>
+
+    <!-- footer area label -->
+    <text x="430" y="77" font-family="system-ui" font-size="10" fill="#34d399" text-anchor="middle">
+      <tspan class="zhi">▼ Footer（附加至檔案末尾）</tspan><tspan class="eni">▼ Footer (appended to file end)</tspan>
+    </text>
+
+    <!-- footer sub-blocks full width -->
+    <rect x="0"   y="84" width="230" height="56" fill="#1a0a0a" stroke="#f87171" stroke-width="1.3"/>
+    <text x="115" y="107" font-family="system-ui" font-size="10" fill="#f87171" text-anchor="middle">enc_meta (var)</text>
+    <text x="115" y="122" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">AES-GCM encrypted JSON</text>
+    <text x="115" y="136" font-family="system-ui" font-size="8"  fill="#9aa4b2" text-anchor="middle">orig_name / size / nonces …</text>
+
+    <rect x="230" y="84" width="50"  height="56" fill="#0a1020" stroke="#60a5fa" stroke-width="1.3"/>
+    <text x="255" y="107" font-family="system-ui" font-size="9"  fill="#60a5fa" text-anchor="middle">meta</text>
+    <text x="255" y="119" font-family="system-ui" font-size="9"  fill="#60a5fa" text-anchor="middle">len</text>
+    <text x="255" y="132" font-family="system-ui" font-size="8"  fill="#9aa4b2" text-anchor="middle">4B LE</text>
+
+    <rect x="280" y="84" width="180" height="56" fill="#0a1f10" stroke="#34d399" stroke-width="1.3"/>
+    <text x="370" y="107" font-family="system-ui" font-size="10" fill="#34d399" text-anchor="middle">masked_salt (16B)</text>
+    <text x="370" y="122" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">salt XOR SHA256(pw)[6:22]</text>
+    <text x="370" y="136" font-family="system-ui" font-size="8"  fill="#9aa4b2" text-anchor="middle">KDF in salt[0] LSB</text>
+
+    <rect x="460" y="84" width="140" height="56" fill="#0a1a20" stroke="#38bdf8" stroke-width="1.3"/>
+    <text x="530" y="107" font-family="system-ui" font-size="10" fill="#38bdf8" text-anchor="middle">head_nonce (12B)</text>
+    <text x="530" y="122" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">+ head_tag (16B)</text>
+
+    <rect x="600" y="84" width="160" height="56" fill="#100a22" stroke="#a78bfa" stroke-width="1.3"/>
+    <text x="680" y="107" font-family="system-ui" font-size="10" fill="#a78bfa" text-anchor="middle">enc_magic (4B)</text>
+    <text x="680" y="122" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">KWRI XOR pw_mask</text>
+    <text x="680" y="136" font-family="system-ui" font-size="8"  fill="#9aa4b2" text-anchor="middle">← file end</text>
+
+    <rect x="760" y="84" width="100" height="56" fill="#020617" stroke="#475569" stroke-width="1.3" stroke-dasharray="4,2"/>
+    <text x="810" y="112" font-family="system-ui" font-size="9" fill="#475569" text-anchor="middle">
+      <tspan class="zhi">（read from end）</tspan><tspan class="eni">(read from end)</tspan>
+    </text>
+  </svg>
+  <button class="btn" style="margin-top:8px" onclick="exportSVG('svgInplaceFormat','kvhwarp_inplace_format.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+
+  <!-- metadata fields table -->
+  <p style="margin:24px 0 10px;color:var(--blue);font-weight:700">
+    <span class="zhi">Metadata JSON 欄位（AES-256-GCM 加密儲存）</span>
+    <span class="eni">Metadata JSON Fields (AES-256-GCM encrypted)</span>
+  </p>
+  <table>
+    <thead><tr>
+      <th><span class="zhi">欄位</span><span class="eni">Field</span></th>
+      <th><span class="zhi">型態</span><span class="eni">Type</span></th>
+      <th><span class="zhi">說明</span><span class="eni">Description</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td><code>orig_name</code></td><td>str</td><td><span class="zhi">原始檔名</span><span class="eni">Original filename</span></td></tr>
+      <tr><td><code>orig_size</code></td><td>int</td><td><span class="zhi">原始大小（bytes）</span><span class="eni">Original file size (bytes)</span></td></tr>
+      <tr><td><code>encrypt_size</code></td><td>int</td><td><span class="zhi">頭部加密 bytes</span><span class="eni">Head encrypt bytes</span></td></tr>
+      <tr><td><code>encrypt_tail</code></td><td>bool</td><td><span class="zhi">是否加密尾部</span><span class="eni">Tail encrypted?</span></td></tr>
+      <tr><td><code>encrypt_middle</code></td><td>bool</td><td><span class="zhi">是否啟用 Middle CTR</span><span class="eni">Middle CTR enabled?</span></td></tr>
+      <tr><td><code>middle_start</code></td><td>int</td><td><span class="zhi">Middle CTR 起始位置</span><span class="eni">Middle CTR start offset</span></td></tr>
+      <tr><td><code>middle_size</code></td><td>int</td><td><span class="zhi">Middle CTR 長度</span><span class="eni">Middle CTR length</span></td></tr>
+      <tr><td><code>middle_nonce</code></td><td>str/null</td><td><span class="zhi">Middle CTR nonce（hex）</span><span class="eni">Middle CTR nonce (hex)</span></td></tr>
+      <tr><td><code>encrypt_range</code></td><td>bool</td><td><span class="zhi">是否啟用 Range CTR</span><span class="eni">Range CTR enabled?</span></td></tr>
+      <tr><td><code>range_start</code></td><td>int</td><td><span class="zhi">Range 起始 offset</span><span class="eni">Range start offset</span></td></tr>
+      <tr><td><code>range_end</code></td><td>int</td><td><span class="zhi">Range 結束 offset</span><span class="eni">Range end offset</span></td></tr>
+      <tr><td><code>range_b_bytes</code></td><td>int</td><td><span class="zhi">每週期加密 bytes（16 的倍數）</span><span class="eni">Encrypted bytes per period (multiple of 16)</span></td></tr>
+      <tr><td><code>range_c_bytes</code></td><td>int</td><td><span class="zhi">週期總長 bytes</span><span class="eni">Total period length bytes</span></td></tr>
+      <tr><td><code>range_nonce</code></td><td>str/null</td><td><span class="zhi">Range CTR nonce（hex）</span><span class="eni">Range CTR nonce (hex)</span></td></tr>
+      <tr><td><code>tail_nonce</code></td><td>str/null</td><td><span class="zhi">尾部 GCM nonce（In-place）</span><span class="eni">Tail GCM nonce (in-place only)</span></td></tr>
+      <tr><td><code>tail_tag</code></td><td>str/null</td><td><span class="zhi">尾部 GCM tag（In-place）</span><span class="eni">Tail GCM tag (in-place only)</span></td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- ===== Algorithms ===== -->
+<section id="algorithms">
+<div class="icon-title">🔑 <span class="zhi">加密演算法</span><span class="eni">Encryption Algorithms</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <div class="zh">
+    <h3 style="color:var(--blue);margin:0 0 16px">金鑰派生（KDF）</h3>
+    <table>
+      <thead><tr><th>模式</th><th>演算法</th><th>參數</th><th>安全強度</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>scrypt</strong> <span class="badge badge-green">建議</span></td>
+          <td><code>hashlib.scrypt</code></td>
+          <td>N=65536, r=8, p=1, dklen=32, maxmem=128MB</td>
+          <td>記憶體困難，抵抗 GPU/ASIC</td>
+        </tr>
+        <tr>
+          <td><strong>SHA-256</strong></td>
+          <td><code>SHA256(password)</code></td>
+          <td>無 salt / 無迭代</td>
+          <td><span class="badge badge-yellow">弱</span> 快速，適合大量檔案</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>KDF 類型編碼於 salt[0] 的 LSB（0=SHA-256，1=scrypt），隨 masked_salt 安全儲存。</p>
+  </div>
+  <div class="en">
+    <h3 style="color:var(--blue);margin:0 0 16px">Key Derivation (KDF)</h3>
+    <table>
+      <thead><tr><th>Mode</th><th>Algorithm</th><th>Parameters</th><th>Security</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>scrypt</strong> <span class="badge badge-green">Recommended</span></td>
+          <td><code>hashlib.scrypt</code></td>
+          <td>N=65536, r=8, p=1, dklen=32, maxmem=128MB</td>
+          <td>Memory-hard, resists GPU/ASIC</td>
+        </tr>
+        <tr>
+          <td><strong>SHA-256</strong></td>
+          <td><code>SHA256(password)</code></td>
+          <td>No salt / no iterations</td>
+          <td><span class="badge badge-yellow">Weak</span> Fast, for bulk processing</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>KDF type is encoded in salt[0] LSB (0=SHA-256, 1=scrypt) and stored securely in masked_salt.</p>
+  </div>
+
+  <div class="zh">
+    <h3 style="color:var(--blue);margin:24px 0 16px">加密原語（Primitives）</h3>
+    <table>
+      <thead><tr><th>用途</th><th>演算法</th><th>Key</th><th>Nonce/IV</th><th>備注</th></tr></thead>
+      <tbody>
+        <tr><td>頭部 / 尾部</td><td>AES-256-GCM</td><td>主 Key</td><td>os.urandom(12)</td><td>認證加密，防竄改</td></tr>
+        <tr><td>Metadata</td><td>AES-256-GCM</td><td>主 Key</td><td>os.urandom(12)</td><td>JSON 加密儲存</td></tr>
+        <tr><td>Middle CTR</td><td>AES-256-CTR</td><td>SHA256(Key + b"\x02")</td><td>os.urandom(8)</td><td>中央錨定</td></tr>
+        <tr><td>Range CTR</td><td>AES-256-CTR</td><td>SHA256(Key + b"\x03")</td><td>os.urandom(8)</td><td>B/C 步進</td></tr>
+        <tr><td>Header 遮罩</td><td>XOR</td><td>SHA256(password)[0:22]</td><td>—</td><td>視覺混淆</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="en">
+    <h3 style="color:var(--blue);margin:24px 0 16px">Cryptographic Primitives</h3>
+    <table>
+      <thead><tr><th>Purpose</th><th>Algorithm</th><th>Key</th><th>Nonce/IV</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Head / Tail</td><td>AES-256-GCM</td><td>Master Key</td><td>os.urandom(12)</td><td>Authenticated, tamper-proof</td></tr>
+        <tr><td>Metadata</td><td>AES-256-GCM</td><td>Master Key</td><td>os.urandom(12)</td><td>JSON encrypted storage</td></tr>
+        <tr><td>Middle CTR</td><td>AES-256-CTR</td><td>SHA256(Key + b"\x02")</td><td>os.urandom(8)</td><td>Center-anchored</td></tr>
+        <tr><td>Range CTR</td><td>AES-256-CTR</td><td>SHA256(Key + b"\x03")</td><td>os.urandom(8)</td><td>B/C stride</td></tr>
+        <tr><td>Header mask</td><td>XOR</td><td>SHA256(password)[0:22]</td><td>—</td><td>Visual obfuscation</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</section>
+
+<!-- ===== Encryption Layers ===== -->
+<section id="layers">
+<div class="icon-title">🧱 <span class="zhi">加密層次架構</span><span class="eni">Encryption Layer Architecture</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <p style="margin:0 0 12px;color:var(--muted)">
+    <span class="zhi">每個加密層獨立作用於不重疊的位元組範圍（CTR 層可疊加）</span>
+    <span class="eni">Each encryption layer operates on a non-overlapping byte range (CTR layers composable)</span>
+  </p>
+
+  <svg id="svgLayers" viewBox="0 0 860 300" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrL" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L7,3 z" fill="#60a5fa"/>
+      </marker>
+    </defs>
+
+    <!-- File bar -->
+    <text x="0" y="14" font-family="system-ui" font-size="11" fill="#9aa4b2">
+      <tspan class="zhi">原始檔案（0 … file_size）</tspan><tspan class="eni">Original file (0 … file_size)</tspan>
+    </text>
+    <rect x="0" y="18" width="860" height="30" rx="2" fill="#0f172a" stroke="#334155" stroke-width="1"/>
+    <text x="430" y="38" font-family="system-ui" font-size="11" fill="#475569" text-anchor="middle">
+      <tspan class="zhi">全長（例如 500 MB）</tspan><tspan class="eni">full file length (e.g. 500 MB)</tspan>
+    </text>
+
+    <!-- Layer 1: Head GCM -->
+    <rect x="0"   y="62" width="86"  height="40" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="43"  y="79" font-family="system-ui" font-size="10" fill="#60a5fa" text-anchor="middle">Head GCM</text>
+    <text x="43"  y="92" font-family="system-ui" font-size="8"  fill="#9aa4b2" text-anchor="middle">0 … 1KB</text>
+    <!-- Layer 1: tail GCM -->
+    <rect x="774" y="62" width="86"  height="40" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="817" y="79" font-family="system-ui" font-size="10" fill="#60a5fa" text-anchor="middle">Tail GCM</text>
+    <text x="817" y="92" font-family="system-ui" font-size="8"  fill="#a78bfa" text-anchor="middle">optional</text>
+
+    <!-- Gap label -->
+    <text x="430" y="60" font-family="system-ui" font-size="10" fill="#475569" text-anchor="middle">
+      <tspan class="zhi">← 中間 gap（以下各 CTR 層均作用於此範圍）→</tspan>
+      <tspan class="eni">← Middle gap (all CTR layers operate within this range) →</tspan>
+    </text>
+
+    <!-- Layer 2: Middle CTR (center anchored ~1MB) -->
+    <rect x="387" y="118" width="86"  height="40" fill="#10302a" stroke="#34d399" stroke-width="1.5"/>
+    <text x="430" y="134" font-family="system-ui" font-size="10" fill="#34d399" text-anchor="middle">Middle CTR</text>
+    <text x="430" y="148" font-family="system-ui" font-size="8"  fill="#9aa4b2" text-anchor="middle">center ±512KB</text>
+
+    <!-- Layer 3: Range CTR (user-defined) -->
+    <rect x="172" y="176" width="344" height="40" fill="#1f1530" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="344" y="193" font-family="system-ui" font-size="10" fill="#a78bfa" text-anchor="middle">Range CTR  ← B/C stride</text>
+    <text x="344" y="209" font-family="system-ui" font-size="8"  fill="#9aa4b2" text-anchor="middle">user-defined start…end</text>
+
+    <!-- brackets + labels right side -->
+    <line x1="760" y1="72" x2="780" y2="72" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="780" y1="72" x2="780" y2="230" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="780" y1="230" x2="760" y2="230" stroke="#60a5fa" stroke-width="1"/>
+    <text x="790" y="100" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">Layer 1</tspan><tspan class="eni">Layer 1</tspan>
+    </text>
+    <text x="790" y="114" font-family="system-ui" font-size="9" fill="#60a5fa">AES-256-GCM</text>
+    <text x="790" y="152" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">Layer 2</tspan><tspan class="eni">Layer 2</tspan>
+    </text>
+    <text x="790" y="166" font-family="system-ui" font-size="9" fill="#34d399">Middle CTR</text>
+    <text x="790" y="200" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">Layer 3</tspan><tspan class="eni">Layer 3</tspan>
+    </text>
+    <text x="790" y="214" font-family="system-ui" font-size="9" fill="#a78bfa">Range CTR</text>
+
+    <!-- note -->
+    <text x="0" y="260" font-family="system-ui" font-size="10" fill="#475569">
+      <tspan class="zhi">※ Layer 2 與 Layer 3 為獨立 CTR 金鑰，互不影響；可同時啟用疊加效果</tspan>
+      <tspan class="eni">※ Layer 2 and Layer 3 use independent CTR keys; both can be enabled simultaneously for compounded effect</tspan>
+    </text>
+    <text x="0" y="276" font-family="system-ui" font-size="10" fill="#475569">
+      <tspan class="zhi">※ GCM 層（Layer 1）提供完整性驗證（Authentication Tag）；CTR 層僅提供機密性</tspan>
+      <tspan class="eni">※ GCM layer (Layer 1) provides integrity via Authentication Tag; CTR layers provide confidentiality only</tspan>
+    </text>
+  </svg>
+  <button class="btn" style="margin-top:8px" onclick="exportSVG('svgLayers','kvhwarp_layers.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+
+</div>
+</section>
+
+<!-- ===== Range CTR ===== -->
+<section id="range-ctr">
+<div class="icon-title">〰️ Range CTR <span class="zhi">步進加密</span><span class="eni">Stride Encryption</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <div class="zh">
+    <p>Range CTR 以 <strong>B/C 週期步進</strong>加密一段使用者自訂的位元組範圍：每 C bytes 中加密前 B bytes，跳過後 (C-B) bytes。CTR 計數器連續遞增（無論是否加密），確保可安全解密。</p>
+    <h4 style="color:var(--blue)">B/C 模式</h4>
+    <table>
+      <thead><tr><th>模式</th><th>說明</th><th>B/C 計算</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>manual</strong></td>
+          <td>直接指定 B（encrypt bytes）與 C（period bytes）</td>
+          <td>用戶設定，16 bytes 對齊</td>
+        </tr>
+        <tr>
+          <td><strong>auto</strong></td>
+          <td>指定加密比例 %，工具自動找最簡 B/C 分數</td>
+          <td><code>Fraction(pct, 100).limit_denominator(max_c)</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>Auto 模式範例</strong>：25% → B=1, C=4 → 每 64 bytes 加密前 16 bytes</p>
+    <p><strong>重要</strong>：auto 模式在 <code>warp_file</code> 內部取得實際 range_size 後才解算 B/C，確保比例正確。</p>
+  </div>
+  <div class="en">
+    <p>Range CTR encrypts a user-defined byte range using a <strong>B/C period stride</strong>: encrypt the first B bytes in each C-byte period, skip the remaining (C-B) bytes. The CTR counter increments continuously (encrypted or not) to enable correct decryption.</p>
+    <h4 style="color:var(--blue)">B/C Modes</h4>
+    <table>
+      <thead><tr><th>Mode</th><th>Description</th><th>B/C Calculation</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>manual</strong></td>
+          <td>Directly set B (encrypt bytes) and C (period bytes)</td>
+          <td>User-specified, aligned to 16 bytes</td>
+        </tr>
+        <tr>
+          <td><strong>auto</strong></td>
+          <td>Set a coverage %, tool finds simplest B/C fraction</td>
+          <td><code>Fraction(pct, 100).limit_denominator(max_c)</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>Auto mode example</strong>: 25% → B=1, C=4 → encrypt first 16 bytes of every 64-byte period</p>
+    <p><strong>Important</strong>: auto mode resolves B/C inside <code>warp_file</code> after the actual range_size is known, ensuring correct coverage.</p>
+  </div>
+
+  <!-- Range CTR stride SVG -->
+  <p style="margin:20px 0 10px;font-size:.9rem;color:var(--muted)">
+    <span class="zhi">▼ B/C 步進示意圖（例：B=1KB, C=4KB，即 25% 加密）</span>
+    <span class="eni">▼ B/C stride diagram (example: B=1KB, C=4KB = 25% encryption)</span>
+  </p>
+  <svg id="svgRangeCtr" viewBox="0 0 860 180" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <!-- 4 periods each 215px wide, B=53.75px (25%) -->
+    <!-- period 0 -->
+    <rect x="0"   y="30" width="54"  height="50" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <rect x="54"  y="30" width="161" height="50" fill="#0d1520" stroke="#334155" stroke-width="1"/>
+    <!-- period 1 -->
+    <rect x="215" y="30" width="54"  height="50" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <rect x="269" y="30" width="161" height="50" fill="#0d1520" stroke="#334155" stroke-width="1"/>
+    <!-- period 2 -->
+    <rect x="430" y="30" width="54"  height="50" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <rect x="484" y="30" width="161" height="50" fill="#0d1520" stroke="#334155" stroke-width="1"/>
+    <!-- period 3 -->
+    <rect x="645" y="30" width="54"  height="50" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <rect x="699" y="30" width="161" height="50" fill="#0d1520" stroke="#334155" stroke-width="1"/>
+
+    <!-- B labels -->
+    <text x="27"  y="51" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">B</text>
+    <text x="242" y="51" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">B</text>
+    <text x="457" y="51" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">B</text>
+    <text x="672" y="51" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">B</text>
+    <text x="27"  y="67" font-family="system-ui" font-size="9" fill="#60a5fa" text-anchor="middle">🔒 enc</text>
+    <text x="242" y="67" font-family="system-ui" font-size="9" fill="#60a5fa" text-anchor="middle">🔒 enc</text>
+    <text x="457" y="67" font-family="system-ui" font-size="9" fill="#60a5fa" text-anchor="middle">🔒 enc</text>
+    <text x="672" y="67" font-family="system-ui" font-size="9" fill="#60a5fa" text-anchor="middle">🔒 enc</text>
+
+    <!-- skip labels -->
+    <text x="135" y="55" font-family="system-ui" font-size="11" fill="#475569" text-anchor="middle">C−B</text>
+    <text x="350" y="55" font-family="system-ui" font-size="11" fill="#475569" text-anchor="middle">C−B</text>
+    <text x="565" y="55" font-family="system-ui" font-size="11" fill="#475569" text-anchor="middle">C−B</text>
+    <text x="780" y="55" font-family="system-ui" font-size="11" fill="#475569" text-anchor="middle">C−B</text>
+    <text x="135" y="69" font-family="system-ui" font-size="9" fill="#475569" text-anchor="middle">skip</text>
+    <text x="350" y="69" font-family="system-ui" font-size="9" fill="#475569" text-anchor="middle">skip</text>
+    <text x="565" y="69" font-family="system-ui" font-size="9" fill="#475569" text-anchor="middle">skip</text>
+    <text x="780" y="69" font-family="system-ui" font-size="9" fill="#475569" text-anchor="middle">skip</text>
+
+    <!-- period braces -->
+    <text x="107" y="15" font-family="system-ui" font-size="10" fill="#facc15" text-anchor="middle">←── Period 0 (C bytes) ──→</text>
+    <text x="322" y="15" font-family="system-ui" font-size="10" fill="#facc15" text-anchor="middle">←── Period 1 (C bytes) ──→</text>
+    <text x="537" y="15" font-family="system-ui" font-size="10" fill="#facc15" text-anchor="middle">←── Period 2 (C bytes) ──→</text>
+    <text x="752" y="15" font-family="system-ui" font-size="10" fill="#facc15" text-anchor="middle">←── Period 3 (C bytes) ──→</text>
+
+    <!-- CTR counter note -->
+    <text x="0"  y="105" font-family="system-ui" font-size="9" fill="#334155">CTR counter:</text>
+    <text x="70" y="105" font-family="system-ui" font-size="9" fill="#60a5fa">blk=0</text>
+    <text x="107" y="105" font-family="system-ui" font-size="9" fill="#475569">1…n</text>
+    <text x="215" y="105" font-family="system-ui" font-size="9" fill="#60a5fa">n+1</text>
+    <text x="252" y="105" font-family="system-ui" font-size="9" fill="#475569">…</text>
+    <text x="120" y="130" font-family="system-ui" font-size="10" fill="#475569">
+      <tspan class="zhi">← CTR 計數器連續遞增，即使跳過區塊，確保 CTR 對齊可解密 →</tspan>
+      <tspan class="eni">← CTR counter advances continuously even over skipped blocks — enables correct decryption →</tspan>
+    </text>
+
+    <!-- legend -->
+    <rect x="0"   y="150" width="12" height="12" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1"/>
+    <text x="17"  y="160" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">B bytes — AES-256-CTR 加密</tspan><tspan class="eni">B bytes — AES-256-CTR encrypted</tspan>
+    </text>
+    <rect x="280" y="150" width="12" height="12" fill="#0d1520" stroke="#334155" stroke-width="1"/>
+    <text x="297" y="160" font-family="system-ui" font-size="10" fill="#9aa4b2">
+      <tspan class="zhi">(C−B) bytes — 跳過（明文）</tspan><tspan class="eni">(C−B) bytes — skipped (plaintext)</tspan>
+    </text>
+  </svg>
+  <button class="btn" style="margin-top:8px" onclick="exportSVG('svgRangeCtr','kvhwarp_range_ctr.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+
+</div>
+</section>
+
+<!-- ===== Encrypt Flowchart ===== -->
+<section id="flowchart">
+<div class="icon-title">📊 <span class="zhi">加密流程圖</span><span class="eni">Encryption Flowchart</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <svg id="svgEncFlow" viewBox="0 0 860 1060" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrE" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/>
+      </marker>
+      <marker id="arrEY" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#facc15"/>
+      </marker>
+    </defs>
+
+    <!-- helper macros via SVG — box at cx,y with label -->
+    <!-- Start -->
+    <rect x="330" y="0"   width="200" height="44" rx="6" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="430" y="27"  font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">
+      <tspan class="zhi">warp_file(path, pw, …)</tspan><tspan class="eni">warp_file(path, pw, …)</tspan>
+    </text>
+    <line x1="430" y1="44" x2="430" y2="64" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+
+    <!-- check warped? -->
+    <rect x="310" y="64"  width="240" height="44" rx="4" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+    <text x="430" y="91"  font-family="system-ui" font-size="12" fill="#facc15" text-anchor="middle">
+      <tspan class="zhi">已加密？is_warped()?</tspan><tspan class="eni">Already warped? is_warped()?</tspan>
+    </text>
+    <!-- YES → skip -->
+    <text x="564" y="87"  font-family="system-ui" font-size="11" fill="#34d399">YES → SKIP</text>
+    <line x1="550" y1="86" x2="564" y2="86" stroke="#facc15" stroke-width="1"/>
+    <line x1="430" y1="108" x2="430" y2="128" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+    <text x="408" y="122"  font-family="system-ui" font-size="11" fill="#f87171">NO</text>
+
+    <!-- KDF -->
+    <rect x="280" y="128" width="300" height="64" rx="4" fill="#0a1f10" stroke="#34d399" stroke-width="1.5"/>
+    <text x="430" y="153" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">
+      <tspan class="zhi">鹽值 = os.urandom(16) + KDF bit</tspan><tspan class="eni">salt = os.urandom(16) + KDF bit</tspan>
+    </text>
+    <text x="430" y="172" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">
+      key = scrypt(pw, salt) or SHA256(pw)
+    </text>
+    <line x1="430" y1="192" x2="430" y2="212" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+
+    <!-- Encrypt head GCM -->
+    <rect x="270" y="212" width="320" height="54" rx="4" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="430" y="235" font-family="system-ui" font-size="12" fill="#60a5fa" text-anchor="middle">
+      <tspan class="zhi">AES-256-GCM 加密頭部 (encrypt_size bytes)</tspan>
+      <tspan class="eni">AES-256-GCM encrypt head (encrypt_size bytes)</tspan>
+    </text>
+    <text x="430" y="256" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">enc_head = nonce(12) + tag(16) + ct</text>
+    <line x1="430" y1="266" x2="430" y2="286" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+
+    <!-- encrypt_tail? -->
+    <rect x="320" y="286" width="220" height="44" rx="4" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+    <text x="430" y="313" font-family="system-ui" font-size="12" fill="#facc15" text-anchor="middle">
+      <tspan class="zhi">encrypt_tail = True?</tspan><tspan class="eni">encrypt_tail = True?</tspan>
+    </text>
+    <!-- YES branch -->
+    <text x="200" y="310" font-family="system-ui" font-size="11" fill="#34d399">YES</text>
+    <line x1="320" y1="308" x2="200" y2="308" stroke="#facc15" stroke-width="1" marker-end="url(#arrEY)"/>
+    <rect x="40"  y="286" width="160" height="44" rx="4" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="120" y="308" font-family="system-ui" font-size="10" fill="#60a5fa" text-anchor="middle">GCM enc_tail</text>
+    <text x="120" y="321" font-family="system-ui" font-size="9" fill="#9aa4b2" text-anchor="middle">last encrypt_size bytes</text>
+    <line x1="430" y1="330" x2="430" y2="350" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+    <text x="408" y="344" font-family="system-ui" font-size="11" fill="#f87171">NO</text>
+
+    <!-- encrypt_middle? -->
+    <rect x="320" y="350" width="220" height="44" rx="4" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+    <text x="430" y="377" font-family="system-ui" font-size="12" fill="#facc15" text-anchor="middle">
+      <tspan class="zhi">encrypt_middle = True?</tspan><tspan class="eni">encrypt_middle = True?</tspan>
+    </text>
+    <!-- YES -->
+    <text x="658" y="372" font-family="system-ui" font-size="11" fill="#34d399">YES</text>
+    <line x1="540" y1="372" x2="658" y2="372" stroke="#facc15" stroke-width="1" marker-end="url(#arrEY)"/>
+    <rect x="660" y="350" width="160" height="44" rx="4" fill="#10302a" stroke="#34d399" stroke-width="1.5"/>
+    <text x="740" y="372" font-family="system-ui" font-size="10" fill="#34d399" text-anchor="middle">_middle_region()</text>
+    <text x="740" y="386" font-family="system-ui" font-size="9" fill="#9aa4b2" text-anchor="middle">CTR center-anchored</text>
+    <line x1="430" y1="394" x2="430" y2="414" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+    <text x="408" y="409" font-family="system-ui" font-size="11" fill="#f87171">NO</text>
+
+    <!-- encrypt_range? -->
+    <rect x="320" y="414" width="220" height="44" rx="4" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+    <text x="430" y="441" font-family="system-ui" font-size="12" fill="#facc15" text-anchor="middle">
+      <tspan class="zhi">encrypt_range = True?</tspan><tspan class="eni">encrypt_range = True?</tspan>
+    </text>
+    <!-- YES -->
+    <text x="200" y="437" font-family="system-ui" font-size="11" fill="#34d399">YES</text>
+    <line x1="320" y1="437" x2="200" y2="437" stroke="#facc15" stroke-width="1" marker-end="url(#arrEY)"/>
+    <rect x="40"  y="414" width="160" height="56" rx="4" fill="#1f1530" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="120" y="436" font-family="system-ui" font-size="10" fill="#a78bfa" text-anchor="middle">
+      <tspan class="zhi">range_mode == auto?</tspan><tspan class="eni">range_mode == auto?</tspan>
+    </text>
+    <text x="120" y="450" font-family="system-ui" font-size="9" fill="#9aa4b2" text-anchor="middle">_range_auto_bc(pct, r_end−r_start)</text>
+    <text x="120" y="463" font-family="system-ui" font-size="9" fill="#a78bfa" text-anchor="middle">→ B/C CTR stride</text>
+    <line x1="430" y1="458" x2="430" y2="478" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+    <text x="408" y="473" font-family="system-ui" font-size="11" fill="#f87171">NO</text>
+
+    <!-- Build + encrypt metadata -->
+    <rect x="260" y="478" width="340" height="54" rx="4" fill="#1a0a0a" stroke="#f87171" stroke-width="1.5"/>
+    <text x="430" y="500" font-family="system-ui" font-size="12" fill="#f87171" text-anchor="middle">
+      <tspan class="zhi">建立 metadata dict → AES-256-GCM 加密</tspan>
+      <tspan class="eni">Build metadata dict → AES-256-GCM encrypt</tspan>
+    </text>
+    <text x="430" y="522" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">enc_meta = nonce(12)+tag(16)+json_ct</text>
+    <line x1="430" y1="532" x2="430" y2="552" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+
+    <!-- Build v2 obfuscated header -->
+    <rect x="260" y="552" width="340" height="64" rx="4" fill="#100a22" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="430" y="574" font-family="system-ui" font-size="12" fill="#a78bfa" text-anchor="middle">
+      <tspan class="zhi">建立 v2 混淆 Header</tspan><tspan class="eni">Build v2 obfuscated header</tspan>
+    </text>
+    <text x="430" y="591" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">magic XOR mask | salt_off | salt_prefix | meta_off | meta_prefix | salt_suffix | meta_len | meta_suffix</text>
+    <text x="430" y="608" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">salt split + meta split = random interleaving</text>
+    <line x1="430" y1="616" x2="430" y2="636" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+
+    <!-- Write .ks file -->
+    <rect x="260" y="636" width="340" height="64" rx="4" fill="#0a1f10" stroke="#34d399" stroke-width="1.5"/>
+    <text x="430" y="659" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">
+      <tspan class="zhi">寫入 .ks 輸出檔</tspan><tspan class="eni">Write .ks output file</tspan>
+    </text>
+    <text x="430" y="676" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">header + enc_head + [CTR middle gap] + [enc_tail]</text>
+    <text x="430" y="692" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">stream in 64KB chunks, apply CTR in-flight</text>
+    <line x1="430" y1="700" x2="430" y2="720" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+
+    <!-- Timestamp rename -->
+    <rect x="280" y="720" width="300" height="44" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="430" y="742" font-family="system-ui" font-size="12" fill="#e5e7eb" text-anchor="middle">
+      <tspan class="zhi">輸出命名為 time_ns().ks</tspan><tspan class="eni">Rename output to time_ns().ks</tspan>
+    </text>
+    <text x="430" y="756" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">os.utime() — restore original mtime/atime</text>
+    <line x1="430" y1="764" x2="430" y2="784" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrE)"/>
+
+    <!-- Done -->
+    <rect x="320" y="784" width="220" height="44" rx="6" fill="#0a1f10" stroke="#34d399" stroke-width="2"/>
+    <text x="430" y="811" font-family="system-ui" font-size="13" fill="#34d399" text-anchor="middle">
+      <tspan class="zhi">回傳 "OK: …" ✓</tspan><tspan class="eni">Return "OK: …" ✓</tspan>
+    </text>
+
+    <!-- note: inplace differences -->
+    <rect x="10" y="840" width="840" height="60" rx="6" fill="#050d18" stroke="#334155" stroke-width="1"/>
+    <text x="430" y="862" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">In-place 模式差異：直接修改原始檔 → 將 GCM ct 原位寫回 → Footer 附加（enc_meta + meta_len + masked_salt + head_nonce + head_tag + enc_magic）→ rename</tspan>
+      <tspan class="eni">In-place differences: modify original file directly → write GCM ct in-place → append footer (enc_meta + meta_len + masked_salt + head_nonce + head_tag + enc_magic) → rename</tspan>
+    </text>
+    <text x="430" y="882" font-family="system-ui" font-size="10" fill="#475569" text-anchor="middle">
+      <tspan class="zhi">← In-place 使用 enc_magic = KWRI；Copy 使用 KWRP →</tspan>
+      <tspan class="eni">← In-place uses enc_magic = KWRI; Copy uses KWRP →</tspan>
+    </text>
+  </svg>
+  <button class="btn" style="margin-top:8px" onclick="exportSVG('svgEncFlow','kvhwarp_enc_flow.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+</div>
+</section>
+
+<!-- ===== Decrypt Flowchart ===== -->
+<section id="decrypt-flow">
+<div class="icon-title">🔓 <span class="zhi">解密流程圖</span><span class="eni">Decryption Flowchart</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <svg id="svgDecFlow" viewBox="0 0 860 900" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrD" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/>
+      </marker>
+    </defs>
+
+    <!-- Start -->
+    <rect x="330" y="0"   width="200" height="44" rx="6" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="430" y="27"  font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">unwarp_auto(path, pw)</text>
+    <line x1="430" y1="44" x2="430" y2="64" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrD)"/>
+
+    <!-- detect format -->
+    <rect x="285" y="64"  width="290" height="54" rx="4" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+    <text x="430" y="85"  font-family="system-ui" font-size="12" fill="#facc15" text-anchor="middle">
+      <tspan class="zhi">讀取頭 4B + 末 4B → XOR pw_mask</tspan>
+      <tspan class="eni">Read head 4B + tail 4B → XOR pw_mask</tspan>
+    </text>
+    <text x="430" y="105" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">KWRP (copy) or KWRI (in-place)?</text>
+    <line x1="430" y1="118" x2="430" y2="138" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrD)"/>
+
+    <!-- KWRP branch -->
+    <text x="220" y="135" font-family="system-ui" font-size="11" fill="#60a5fa">KWRP (copy)</text>
+    <text x="550" y="135" font-family="system-ui" font-size="11" fill="#a78bfa">KWRI (in-place)</text>
+
+    <!-- copy path -->
+    <rect x="80"  y="138" width="220" height="64" rx="4" fill="#0a1020" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="190" y="160" font-family="system-ui" font-size="10" fill="#60a5fa" text-anchor="middle">
+      <tspan class="zhi">解析 v2 Header</tspan><tspan class="eni">Parse v2 header</tspan>
+    </text>
+    <text x="190" y="174" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">read salt_off, meta_off → reconstruct salt + enc_meta</text>
+    <text x="190" y="188" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">meta_enc_len at offset 6+salt+1+</text>
+
+    <!-- inplace path -->
+    <rect x="560" y="138" width="220" height="64" rx="4" fill="#0a1020" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="670" y="160" font-family="system-ui" font-size="10" fill="#a78bfa" text-anchor="middle">
+      <tspan class="zhi">解析 v2 Footer</tspan><tspan class="eni">Parse v2 footer</tspan>
+    </text>
+    <text x="670" y="174" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">read tail: enc_magic(4)+head_tag(16)+head_nonce(12)</text>
+    <text x="670" y="188" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">+masked_salt(16)+meta_len(4)+enc_meta(var)</text>
+
+    <!-- merge -->
+    <line x1="190" y1="202" x2="190" y2="240" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="190" y1="240" x2="430" y2="240" stroke="#60a5fa" stroke-width="1" marker-end="url(#arrD)"/>
+    <line x1="670" y1="202" x2="670" y2="240" stroke="#a78bfa" stroke-width="1"/>
+    <line x1="670" y1="240" x2="440" y2="240" stroke="#a78bfa" stroke-width="1" marker-end="url(#arrD)"/>
+
+    <!-- KDF + decrypt meta -->
+    <rect x="260" y="250" width="340" height="64" rx="4" fill="#0a1f10" stroke="#34d399" stroke-width="1.5"/>
+    <text x="430" y="272" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">
+      <tspan class="zhi">KDF: 從 salt[0] LSB 判斷 scrypt / SHA-256</tspan>
+      <tspan class="eni">KDF: check salt[0] LSB → scrypt or SHA-256</tspan>
+    </text>
+    <text x="430" y="290" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">key = derive_key(pw, kdf, salt)</text>
+    <text x="430" y="306" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">metadata = _decrypt_meta(key, enc_meta)</text>
+    <line x1="430" y1="314" x2="430" y2="334" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrD)"/>
+
+    <!-- Decrypt head GCM -->
+    <rect x="280" y="334" width="300" height="44" rx="4" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="430" y="356" font-family="system-ui" font-size="12" fill="#60a5fa" text-anchor="middle">
+      <tspan class="zhi">GCM 解密頭部（驗證 tag）</tspan>
+      <tspan class="eni">GCM decrypt head (verify tag)</tspan>
+    </text>
+    <text x="430" y="371" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">_decrypt_blob(key, enc_head_blob)</text>
+    <line x1="430" y1="378" x2="430" y2="398" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrD)"/>
+
+    <!-- middle / range CTR reverse -->
+    <rect x="220" y="398" width="420" height="64" rx="4" fill="#0d1520" stroke="#475569" stroke-width="1.5"/>
+    <text x="430" y="420" font-family="system-ui" font-size="12" fill="#64748b" text-anchor="middle">
+      <tspan class="zhi">串流中段 gap — 反向套用 CTR（對稱操作）</tspan>
+      <tspan class="eni">Stream middle gap — reverse CTR (symmetric operation)</tspan>
+    </text>
+    <text x="430" y="438" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">Middle CTR: _apply_ctr(b"\x02", middle_nonce, …)</tspan>
+      <tspan class="eni">Middle CTR: _apply_ctr(b"\x02", middle_nonce, …)</tspan>
+    </text>
+    <text x="430" y="454" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">Range CTR: _apply_range_ctr_chunk(…) — same call decrypts</tspan>
+      <tspan class="eni">Range CTR: _apply_range_ctr_chunk(…) — same call decrypts</tspan>
+    </text>
+    <line x1="430" y1="462" x2="430" y2="482" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrD)"/>
+
+    <!-- decrypt tail -->
+    <rect x="310" y="482" width="240" height="44" rx="4" fill="#1a1a2e" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="430" y="504" font-family="system-ui" font-size="12" fill="#a78bfa" text-anchor="middle">
+      <tspan class="zhi">GCM 解密尾部（若有）</tspan>
+      <tspan class="eni">GCM decrypt tail (if present)</tspan>
+    </text>
+    <text x="430" y="519" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">metadata.encrypt_tail → tail_nonce / tail_tag</text>
+    <line x1="430" y1="526" x2="430" y2="546" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrD)"/>
+
+    <!-- restore name + timestamps -->
+    <rect x="260" y="546" width="340" height="54" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="430" y="568" font-family="system-ui" font-size="12" fill="#e5e7eb" text-anchor="middle">
+      <tspan class="zhi">還原 orig_name + 目錄結構</tspan>
+      <tspan class="eni">Restore orig_name + directory structure</tspan>
+    </text>
+    <text x="430" y="586" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">metadata.orig_name / base_folder path reconstruction</text>
+    <line x1="430" y1="600" x2="430" y2="620" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrD)"/>
+
+    <!-- Done -->
+    <rect x="320" y="620" width="220" height="44" rx="6" fill="#0a1f10" stroke="#34d399" stroke-width="2"/>
+    <text x="430" y="647" font-family="system-ui" font-size="13" fill="#34d399" text-anchor="middle">
+      <tspan class="zhi">回傳 "OK: …" ✓</tspan><tspan class="eni">Return "OK: …" ✓</tspan>
+    </text>
+
+    <!-- error paths note -->
+    <rect x="10" y="690" width="840" height="50" rx="6" fill="#050d18" stroke="#f87171" stroke-width="1"/>
+    <text x="430" y="711" font-family="system-ui" font-size="10" fill="#f87171" text-anchor="middle">
+      <tspan class="zhi">任一步驟失敗（tag 驗證失敗 / 密碼錯誤 / 格式錯誤）→ 所有路徑拋出相同的 ValueError("Wrong password or corrupted file")</tspan>
+      <tspan class="eni">Any step failure (tag verify / wrong pw / format) → all paths raise identical ValueError("Wrong password or corrupted file")</tspan>
+    </text>
+    <text x="430" y="729" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">← 防止 Oracle 攻擊：無論是密碼錯誤或資料竄改，錯誤訊息完全相同 →</tspan>
+      <tspan class="eni">← Prevents oracle attacks: identical error message for wrong password vs. tampered data →</tspan>
+    </text>
+  </svg>
+  <button class="btn" style="margin-top:8px" onclick="exportSVG('svgDecFlow','kvhwarp_dec_flow.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+</div>
+</section>
+
+<!-- ===== Options ===== -->
+<section id="options">
+<div class="icon-title">⚙️ <span class="zhi">選項說明</span><span class="eni">Options Reference</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <div class="zh">
+    <h3 style="color:var(--blue);margin:0 0 14px">核心加密選項</h3>
+    <table>
+      <thead><tr><th>選項</th><th>預設</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>encrypt_size</code></td><td>1024</td><td>頭部加密 bytes（1024 / 4096 / 65536 / 1MB）</td></tr>
+        <tr><td><code>encrypt_all</code></td><td>False</td><td>加密整個檔案（覆蓋 encrypt_size）</td></tr>
+        <tr><td><code>encrypt_tail</code></td><td>False</td><td>同時加密尾部 N bytes（需 file ≥ 2N）</td></tr>
+        <tr><td><code>kdf</code></td><td>scrypt</td><td>金鑰派生函數：scrypt 或 SHA-256</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:24px 0 14px">Middle CTR（中央 AES-256-CTR）</h3>
+    <table>
+      <thead><tr><th>選項</th><th>預設</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>encrypt_middle_copy</code></td><td>True</td><td>Copy 模式預設開啟</td></tr>
+        <tr><td><code>encrypt_middle_inplace</code></td><td>False</td><td>In-place 模式預設關閉</td></tr>
+        <tr><td><code>encrypt_middle_size</code></td><td>1,048,576</td><td>中央 CTR 區域大小（bytes）</td></tr>
+      </tbody>
+    </table>
+    <p>Middle CTR 以檔案中心為錨定，向兩側延伸 <code>encrypt_middle_size/2</code>，但不超出頭尾加密範圍。</p>
+
+    <h3 style="color:var(--blue);margin:24px 0 14px">Range CTR（步進 AES-256-CTR）</h3>
+    <table>
+      <thead><tr><th>選項</th><th>預設</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>encrypt_range</code></td><td>False</td><td>啟用 B/C 步進 CTR</td></tr>
+        <tr><td><code>range_mode</code></td><td>auto</td><td><code>auto</code>（按比例）或 <code>manual</code>（手動 B/C）</td></tr>
+        <tr><td><code>range_percent</code></td><td>25</td><td>Auto 模式：每週期加密 %</td></tr>
+        <tr><td><code>range_start_mb</code></td><td>0.0</td><td>Range 起始（MB）</td></tr>
+        <tr><td><code>range_end_mb</code></td><td>0.0</td><td>Range 結束（MB），0 = 至檔案末</td></tr>
+        <tr><td><code>range_b</code></td><td>1</td><td>Manual 模式：每週期加密 N 個 unit</td></tr>
+        <tr><td><code>range_c</code></td><td>4</td><td>Manual 模式：週期 N 個 unit</td></tr>
+        <tr><td><code>range_unit</code></td><td>KB</td><td>B / KB / MB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="en">
+    <h3 style="color:var(--blue);margin:0 0 14px">Core Encryption Options</h3>
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>encrypt_size</code></td><td>1024</td><td>Head encrypt bytes (1024 / 4096 / 65536 / 1MB)</td></tr>
+        <tr><td><code>encrypt_all</code></td><td>False</td><td>Encrypt entire file (overrides encrypt_size)</td></tr>
+        <tr><td><code>encrypt_tail</code></td><td>False</td><td>Also encrypt last N bytes (requires file ≥ 2N)</td></tr>
+        <tr><td><code>kdf</code></td><td>scrypt</td><td>Key derivation: scrypt or SHA-256</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:24px 0 14px">Middle CTR (Center-Anchored AES-256-CTR)</h3>
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>encrypt_middle_copy</code></td><td>True</td><td>Enabled by default in copy mode</td></tr>
+        <tr><td><code>encrypt_middle_inplace</code></td><td>False</td><td>Disabled by default in in-place mode</td></tr>
+        <tr><td><code>encrypt_middle_size</code></td><td>1,048,576</td><td>Center CTR region size (bytes)</td></tr>
+      </tbody>
+    </table>
+    <p>Middle CTR anchors at the file center and extends <code>encrypt_middle_size/2</code> in both directions, clamped to the head/tail gap.</p>
+
+    <h3 style="color:var(--blue);margin:24px 0 14px">Range CTR (B/C-Stride AES-256-CTR)</h3>
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>encrypt_range</code></td><td>False</td><td>Enable B/C stride CTR</td></tr>
+        <tr><td><code>range_mode</code></td><td>auto</td><td><code>auto</code> (by percent) or <code>manual</code> (explicit B/C)</td></tr>
+        <tr><td><code>range_percent</code></td><td>25</td><td>Auto mode: encrypt % per period</td></tr>
+        <tr><td><code>range_start_mb</code></td><td>0.0</td><td>Range start (MB)</td></tr>
+        <tr><td><code>range_end_mb</code></td><td>0.0</td><td>Range end (MB), 0 = file end</td></tr>
+        <tr><td><code>range_b</code></td><td>1</td><td>Manual mode: encrypt N units per period</td></tr>
+        <tr><td><code>range_c</code></td><td>4</td><td>Manual mode: period N units</td></tr>
+        <tr><td><code>range_unit</code></td><td>KB</td><td>B / KB / MB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</section>
+
+<!-- ===== CLI Usage ===== -->
+<section id="cli">
+<div class="icon-title">💻 CLI <span class="zhi">用法</span><span class="eni">Usage</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <div class="zh">
+    <h3 style="color:var(--blue);margin:0 0 12px">子命令總覽</h3>
+    <pre><code>python KvhWarp_CLI.py &lt;command&gt; &lt;folder&gt; [options]
+
+命令：
+  warp         加密資料夾內所有符合條件的檔案
+  unwarp       解密資料夾內所有 .ks 檔案
+  unwarp-file  解密單一 .ks 檔案</code></pre>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">warp 命令選項</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>-p, --password PW</code></td><td>加密密碼（省略則提示輸入）</td></tr>
+        <tr><td><code>--sha256</code></td><td>使用 SHA-256 KDF（預設 scrypt）</td></tr>
+        <tr><td><code>--copy</code></td><td>Copy 模式（預設 in-place）</td></tr>
+        <tr><td><code>--encrypt-size N</code></td><td>頭部加密 bytes：1024/4096/65536/1048576</td></tr>
+        <tr><td><code>--tail</code></td><td>同時加密尾部</td></tr>
+        <tr><td><code>--all</code></td><td>加密整個檔案</td></tr>
+        <tr><td><code>--middle / --no-middle</code></td><td>強制開啟/關閉 Middle CTR</td></tr>
+        <tr><td><code>--middle-size BYTES</code></td><td>Middle CTR 大小（預設 1MB）</td></tr>
+        <tr><td><code>--range</code></td><td>啟用 Range CTR</td></tr>
+        <tr><td><code>--range-percent PCT</code></td><td>Auto 模式加密比例（預設 25）</td></tr>
+        <tr><td><code>--range-manual</code></td><td>切換至 Manual B/C 模式</td></tr>
+        <tr><td><code>--range-start MB</code></td><td>Range 起始 MB</td></tr>
+        <tr><td><code>--range-end MB</code></td><td>Range 結束 MB（0=檔案末）</td></tr>
+        <tr><td><code>--range-b N</code></td><td>Manual: 每週期加密 N 個 unit</td></tr>
+        <tr><td><code>--range-c N</code></td><td>Manual: 週期 N 個 unit</td></tr>
+        <tr><td><code>--range-unit {B,KB,MB}</code></td><td>B/C 單位</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="en">
+    <h3 style="color:var(--blue);margin:0 0 12px">Sub-command Overview</h3>
+    <pre><code>python KvhWarp_CLI.py &lt;command&gt; &lt;folder&gt; [options]
+
+Commands:
+  warp         Encrypt all eligible files in folder
+  unwarp       Decrypt all .ks files in folder
+  unwarp-file  Decrypt a single .ks file</code></pre>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">warp Command Options</h3>
+    <table>
+      <thead><tr><th>Flag</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>-p, --password PW</code></td><td>Password (prompted if omitted)</td></tr>
+        <tr><td><code>--sha256</code></td><td>Use SHA-256 KDF (default: scrypt)</td></tr>
+        <tr><td><code>--copy</code></td><td>Copy mode (default: in-place)</td></tr>
+        <tr><td><code>--encrypt-size N</code></td><td>Head bytes to encrypt: 1024/4096/65536/1048576</td></tr>
+        <tr><td><code>--tail</code></td><td>Also encrypt tail</td></tr>
+        <tr><td><code>--all</code></td><td>Encrypt entire file</td></tr>
+        <tr><td><code>--middle / --no-middle</code></td><td>Force enable/disable Middle CTR</td></tr>
+        <tr><td><code>--middle-size BYTES</code></td><td>Middle CTR size (default: 1MB)</td></tr>
+        <tr><td><code>--range</code></td><td>Enable Range CTR</td></tr>
+        <tr><td><code>--range-percent PCT</code></td><td>Auto mode coverage % (default: 25)</td></tr>
+        <tr><td><code>--range-manual</code></td><td>Switch to manual B/C mode</td></tr>
+        <tr><td><code>--range-start MB</code></td><td>Range start in MB</td></tr>
+        <tr><td><code>--range-end MB</code></td><td>Range end in MB (0 = file end)</td></tr>
+        <tr><td><code>--range-b N</code></td><td>Manual: encrypt N units per period</td></tr>
+        <tr><td><code>--range-c N</code></td><td>Manual: period is N units</td></tr>
+        <tr><td><code>--range-unit {B,KB,MB}</code></td><td>Unit for B/C values</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</section>
+
+<!-- ===== Examples ===== -->
+<section id="examples">
+<div class="icon-title">📝 <span class="zhi">使用範例</span><span class="eni">Usage Examples</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <div class="zh">
+    <h3 style="color:var(--blue);margin:0 0 12px">基本加密 / 解密</h3>
+    <pre><code># 原地加密資料夾（預設 in-place, scrypt, middle CTR 關閉）
+python KvhWarp_CLI.py warp /media/videos
+
+# Copy 模式（保留原始檔，Middle CTR 預設開啟）
+python KvhWarp_CLI.py warp /media/docs --copy
+
+# 使用 SHA-256 KDF（速度優先，安全性較低）
+python KvhWarp_CLI.py warp /media/videos --sha256
+
+# 解密整個資料夾
+python KvhWarp_CLI.py unwarp /media/videos
+
+# 解密單一檔案
+python KvhWarp_CLI.py unwarp-file 1745000000000000000.ks</code></pre>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">進階加密選項</h3>
+    <pre><code># 加密頭尾 + Middle CTR（copy 模式）
+python KvhWarp_CLI.py warp /docs --copy --tail --middle
+
+# 加密整個檔案（安全文件）
+python KvhWarp_CLI.py warp /confidential --all
+
+# 加密頭部 4KB（大型影片）
+python KvhWarp_CLI.py warp /videos --encrypt-size 4096</code></pre>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Range CTR 步進加密</h3>
+    <pre><code># Auto 模式：整個檔案每週期加密 25%（預設）
+python KvhWarp_CLI.py warp /videos --range
+
+# Auto 模式：50% 覆蓋
+python KvhWarp_CLI.py warp /videos --range --range-percent 50
+
+# Auto 模式：只在 100MB~500MB 範圍加密 30%
+python KvhWarp_CLI.py warp /videos --range --range-percent 30 \
+    --range-start 100 --range-end 500
+
+# Manual 模式：每 4KB 加密前 1KB（25%）
+python KvhWarp_CLI.py warp /videos --range --range-manual \
+    --range-b 1 --range-c 4 --range-unit KB
+
+# Manual 模式：每 1MB 加密前 256KB（25%）
+python KvhWarp_CLI.py warp /videos --range --range-manual \
+    --range-b 256 --range-c 1024 --range-unit KB</code></pre>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">組合所有層次</h3>
+    <pre><code># 最高強度：GCM 頭尾 + Middle CTR + Range CTR auto 50%
+python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
+    --range --range-percent 50</code></pre>
+  </div>
+
+  <div class="en">
+    <h3 style="color:var(--blue);margin:0 0 12px">Basic Encrypt / Decrypt</h3>
+    <pre><code># In-place encrypt folder (default: in-place, scrypt, middle CTR off)
+python KvhWarp_CLI.py warp /media/videos
+
+# Copy mode (preserve originals, middle CTR on by default)
+python KvhWarp_CLI.py warp /media/docs --copy
+
+# SHA-256 KDF (speed priority, weaker security)
+python KvhWarp_CLI.py warp /media/videos --sha256
+
+# Decrypt whole folder
+python KvhWarp_CLI.py unwarp /media/videos
+
+# Decrypt single file
+python KvhWarp_CLI.py unwarp-file 1745000000000000000.ks</code></pre>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Advanced Encryption Options</h3>
+    <pre><code># Head + tail + middle CTR (copy mode)
+python KvhWarp_CLI.py warp /docs --copy --tail --middle
+
+# Full file encryption (confidential documents)
+python KvhWarp_CLI.py warp /confidential --all
+
+# 4KB head encrypt (large video files)
+python KvhWarp_CLI.py warp /videos --encrypt-size 4096</code></pre>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Range CTR Stride Encryption</h3>
+    <pre><code># Auto mode: encrypt 25% per period across whole file (default)
+python KvhWarp_CLI.py warp /videos --range
+
+# Auto mode: 50% coverage
+python KvhWarp_CLI.py warp /videos --range --range-percent 50
+
+# Auto mode: 30% coverage, 100MB–500MB only
+python KvhWarp_CLI.py warp /videos --range --range-percent 30 \
+    --range-start 100 --range-end 500
+
+# Manual mode: encrypt first 1KB of every 4KB period (25%)
+python KvhWarp_CLI.py warp /videos --range --range-manual \
+    --range-b 1 --range-c 4 --range-unit KB
+
+# Manual mode: encrypt first 256KB of every 1MB period (25%)
+python KvhWarp_CLI.py warp /videos --range --range-manual \
+    --range-b 256 --range-c 1024 --range-unit KB</code></pre>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">All Layers Combined</h3>
+    <pre><code># Maximum: GCM head+tail + Middle CTR + Range CTR auto 50%
+python KvhWarp_CLI.py warp /sensitive --copy --tail --middle \
+    --range --range-percent 50</code></pre>
+  </div>
+
+</div>
+</section>
+
+<!-- ===== Security ===== -->
+<section id="security">
+<div class="icon-title">🛡️ <span class="zhi">安全分析</span><span class="eni">Security Analysis</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <div class="zh">
+    <h3 style="color:var(--blue);margin:0 0 12px">設計原則</h3>
+    <ul>
+      <li><strong>認證加密（AEAD）</strong>：GCM 層提供 Authentication Tag，防止靜默竄改</li>
+      <li><strong>Oracle 防護</strong>：解密失敗路徑統一拋出相同 ValueError，防止旁路洩漏</li>
+      <li><strong>唯一 Nonce</strong>：每次加密均 os.urandom() 生成，防止重放攻擊</li>
+      <li><strong>鹽值隔離</strong>：scrypt 每個檔案獨立 16B 鹽值</li>
+      <li><strong>Key 分離</strong>：Middle / Range CTR 使用 SHA256(key + suffix) 各自派生，不共用主 Key</li>
+      <li><strong>Header 混淆</strong>：magic / salt / meta 均 XOR 密碼遮罩，阻擋 magic byte 掃描</li>
+    </ul>
+    <h3 style="color:var(--blue);margin:20px 0 12px">威脅矩陣</h3>
+    <table>
+      <thead><tr><th>威脅</th><th>防護措施</th><th>殘餘風險</th></tr></thead>
+      <tbody>
+        <tr><td>暴力破解密碼</td><td>scrypt (N=65536, r=8)</td><td><span class="badge badge-green">低</span> 弱密碼仍有風險</td></tr>
+        <tr><td>Magic byte 掃描識別</td><td>XOR 密碼遮罩混淆 magic</td><td><span class="badge badge-green">低</span></td></tr>
+        <tr><td>資料竄改</td><td>GCM Authentication Tag</td><td><span class="badge badge-green">低</span> 僅 GCM 區塊有效</td></tr>
+        <tr><td>CTR 區塊竄改</td><td>無 MAC（CTR 層無認證）</td><td><span class="badge badge-yellow">中</span></td></tr>
+        <tr><td>元資料洩漏</td><td>AES-GCM 加密 JSON metadata</td><td><span class="badge badge-green">低</span></td></tr>
+        <tr><td>SHA-256 KDF 字典攻擊</td><td>不建議使用 SHA-256 KDF</td><td><span class="badge badge-red">高</span> 弱密碼易破解</td></tr>
+        <tr><td>記憶體轉儲</td><td>未清除密碼/密鑰記憶體</td><td><span class="badge badge-yellow">中</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="en">
+    <h3 style="color:var(--blue);margin:0 0 12px">Design Principles</h3>
+    <ul>
+      <li><strong>Authenticated Encryption (AEAD)</strong>: GCM provides Authentication Tag, preventing silent tampering</li>
+      <li><strong>Oracle resistance</strong>: All decryption failure paths raise identical ValueError, no side-channel leakage</li>
+      <li><strong>Unique nonces</strong>: os.urandom() per encryption, preventing replay attacks</li>
+      <li><strong>Salt isolation</strong>: scrypt uses independent 16B salt per file</li>
+      <li><strong>Key separation</strong>: Middle / Range CTR keys derived via SHA256(key + suffix), not sharing master key</li>
+      <li><strong>Header obfuscation</strong>: magic / salt / meta all XOR-masked with password-derived mask, blocks magic byte scanning</li>
+    </ul>
+    <h3 style="color:var(--blue);margin:20px 0 12px">Threat Matrix</h3>
+    <table>
+      <thead><tr><th>Threat</th><th>Mitigation</th><th>Residual Risk</th></tr></thead>
+      <tbody>
+        <tr><td>Brute-force password</td><td>scrypt (N=65536, r=8)</td><td><span class="badge badge-green">Low</span> weak passwords still at risk</td></tr>
+        <tr><td>Magic byte scanning</td><td>XOR password-mask obfuscation</td><td><span class="badge badge-green">Low</span></td></tr>
+        <tr><td>Data tampering</td><td>GCM Authentication Tag</td><td><span class="badge badge-green">Low</span> GCM blocks only</td></tr>
+        <tr><td>CTR block tampering</td><td>No MAC on CTR layers</td><td><span class="badge badge-yellow">Medium</span></td></tr>
+        <tr><td>Metadata leakage</td><td>AES-GCM encrypted JSON metadata</td><td><span class="badge badge-green">Low</span></td></tr>
+        <tr><td>SHA-256 KDF dict attack</td><td>Not recommended — use scrypt</td><td><span class="badge badge-red">High</span> with weak passwords</td></tr>
+        <tr><td>Memory dump</td><td>Password/key not explicitly cleared</td><td><span class="badge badge-yellow">Medium</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</section>
+
+<!-- ===== Limitations ===== -->
+<section id="limits">
+<div class="icon-title">⚠️ <span class="zhi">限制與風險</span><span class="eni">Limitations &amp; Risks</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh">
+    <div class="warn-box"><strong>KvhWarp 以隱匿為主要設計目標，不是軍事級完整檔案加密方案。</strong></div>
+    <ul>
+      <li>In-place 模式：中段明文保留在原始位置，大型影片中段內容未受保護</li>
+      <li>CTR 層（Middle / Range）不提供完整性認證，可被靜默修改</li>
+      <li>SHA-256 KDF 無抗暴力破解能力，不建議用於機密文件</li>
+      <li>密碼未從記憶體清除（無 SecureString 機制）</li>
+      <li>時間戳命名提供視覺匿蹤，但不防範已知日期/時間的關聯推斷</li>
+      <li>不防範：記憶體傾印、鍵盤記錄器、實體存取、進階取證還原</li>
+    </ul>
+    <h3 style="color:var(--blue);margin:20px 0 12px">建議使用情境</h3>
+    <table>
+      <thead><tr><th>情境</th><th>建議設定</th></tr></thead>
+      <tbody>
+        <tr><td>大型影片防窺（速度優先）</td><td>In-place + SHA-256 + 1KB head</td></tr>
+        <tr><td>影片資料夾隱藏（平衡）</td><td>In-place + scrypt + Middle CTR</td></tr>
+        <tr><td>重要文件（安全優先）</td><td>Copy + scrypt + --all + tail</td></tr>
+        <tr><td>最高隱匿強度</td><td>Copy + scrypt + tail + Middle + Range CTR 50%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="en">
+    <div class="warn-box"><strong>KvhWarp is designed primarily for stealth — not military-grade full-file encryption.</strong></div>
+    <ul>
+      <li>In-place mode: middle plaintext remains at original position; large video middle content is unprotected</li>
+      <li>CTR layers (Middle / Range) provide no integrity authentication — can be silently modified</li>
+      <li>SHA-256 KDF has no brute-force resistance — not recommended for confidential documents</li>
+      <li>Password is not explicitly cleared from memory (no SecureString mechanism)</li>
+      <li>Timestamp naming provides visual stealth but doesn't prevent date/time correlation inference</li>
+      <li>Does not protect against: memory dumps, keyloggers, physical access, advanced forensic recovery</li>
+    </ul>
+    <h3 style="color:var(--blue);margin:20px 0 12px">Recommended Use Cases</h3>
+    <table>
+      <thead><tr><th>Scenario</th><th>Recommended Settings</th></tr></thead>
+      <tbody>
+        <tr><td>Large video stealth (speed first)</td><td>In-place + SHA-256 + 1KB head</td></tr>
+        <tr><td>Video folder hiding (balanced)</td><td>In-place + scrypt + Middle CTR</td></tr>
+        <tr><td>Important documents (security first)</td><td>Copy + scrypt + --all + tail</td></tr>
+        <tr><td>Maximum stealth strength</td><td>Copy + scrypt + tail + Middle + Range CTR 50%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</section>
+
+
+<!-- ===== Test Results ===== -->
+<section id="test-results">
+<div class="icon-title">✅ <span class="zhi">完整測試套件結果（8 個套件）</span><span class="eni">Full Test Suite Results (8 Suites)</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh">
+    <p>測試日期：<strong>2026-04-20</strong>&nbsp;｜&nbsp;版本：<strong>v1.0.3</strong>&nbsp;｜&nbsp;平台：Windows 11 / Python 3.14</p>
+    <p>共 8 個測試套件，涵蓋 Copy 模式、In-place 模式、is_warped()、base_folder、錯誤路徑、邊界值、模式等效性與資料夾功能，總計 <strong>890 次</strong>測試。</p>
+    <table>
+      <thead><tr><th>套件</th><th>測試腳本</th><th>說明</th><th>總次數</th><th>PASS</th><th>FAIL</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code>_test_copy_combos.py</code></td><td>Copy 模式全組合矩陣（48 組合 × 3 檔案）</td><td>144</td><td style="color:var(--green)">144</td><td>0</td></tr>
+        <tr><td>2</td><td><code>_test_copy_random.py</code></td><td>Copy 模式隨機參數往返</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>3</td><td><code>_test_base_folder.py</code></td><td>base_folder 參數（固定 + 隨機路徑）</td><td>144</td><td style="color:var(--green)">144</td><td>0</td></tr>
+        <tr><td>4</td><td><code>_test_is_warped.py</code></td><td>is_warped() 各種情境（正確 / 錯誤密碼 / 截斷）</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>5</td><td><code>_test_error_paths.py</code></td><td>錯誤路徑（錯誤密碼 / 資料損壞 / 截斷 / 已加密）</td><td>102</td><td style="color:var(--green)">102</td><td>0</td></tr>
+        <tr><td>6</td><td><code>_test_boundaries.py</code></td><td>邊界值（最小檔案 / 極值 encrypt_size / range 邊界）</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>7</td><td><code>_test_folders.py</code></td><td>資料夾 rename / restore / cleanup 功能</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>8</td><td><code>_test_mode_equivalence.py</code></td><td>Copy 與 In-place 模式輸出 SHA-256 等效性</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="3">合計</td><td>890</td><td style="color:var(--green)">890</td><td>0</td></tr>
+      </tbody>
+    </table>
+    <div class="note-box" style="margin-top:14px">全部 890 次測試<strong>零失敗</strong>。測試涵蓋：固定組合矩陣、完全隨機參數、邊界值、錯誤注入、模式等效性與資料夾操作。</div>
+  </div>
+  <div class="en">
+    <p>Test date: <strong>2026-04-20</strong>&nbsp;|&nbsp;Version: <strong>v1.0.3</strong>&nbsp;|&nbsp;Platform: Windows 11 / Python 3.14</p>
+    <p>8 test suites covering copy mode, in-place mode, is_warped(), base_folder, error paths, boundary values, mode equivalence and folder functions — <strong>890 total runs</strong>.</p>
+    <table>
+      <thead><tr><th>Suite</th><th>Script</th><th>Description</th><th>Total</th><th>PASS</th><th>FAIL</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code>_test_copy_combos.py</code></td><td>Copy mode full combination matrix (48 combos × 3 files)</td><td>144</td><td style="color:var(--green)">144</td><td>0</td></tr>
+        <tr><td>2</td><td><code>_test_copy_random.py</code></td><td>Copy mode randomized round-trips</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>3</td><td><code>_test_base_folder.py</code></td><td>base_folder parameter (fixed + random paths)</td><td>144</td><td style="color:var(--green)">144</td><td>0</td></tr>
+        <tr><td>4</td><td><code>_test_is_warped.py</code></td><td>is_warped() scenarios (correct / wrong pw / truncated)</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>5</td><td><code>_test_error_paths.py</code></td><td>Error paths (wrong pw / corruption / truncation / already-warped)</td><td>102</td><td style="color:var(--green)">102</td><td>0</td></tr>
+        <tr><td>6</td><td><code>_test_boundaries.py</code></td><td>Boundary values (min file / extreme encrypt_size / range edges)</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>7</td><td><code>_test_folders.py</code></td><td>Folder rename / restore / cleanup functions</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr><td>8</td><td><code>_test_mode_equivalence.py</code></td><td>Copy vs in-place SHA-256 output equivalence</td><td>100</td><td style="color:var(--green)">100</td><td>0</td></tr>
+        <tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="3">Total</td><td>890</td><td style="color:var(--green)">890</td><td>0</td></tr>
+      </tbody>
+    </table>
+    <div class="note-box" style="margin-top:14px">All 890 runs passed — <strong>zero failures</strong>. Coverage includes: fixed combination matrix, fully randomized parameters, boundary values, error injection, mode equivalence and folder operations.</div>
+  </div>
+</div>
+
+<!-- ── Suite details ── -->
+<div class="divider" style="margin:28px 0 20px"></div>
+<div class="icon-title" style="font-size:1.05rem">🔬 <span class="zhi">套件詳細說明</span><span class="eni">Suite Details</span></div>
+<div class="panel" style="margin-top:12px">
+  <div class="zh">
+    <h3 style="color:var(--blue);margin:0 0 12px">Suite 1 — Copy 模式全組合（144 次）</h3>
+    <p>2 × 2 × 2 × 6 = 48 組合 × 3 檔案大小，對所有 KDF / tail / middle / range 排列執行 warp → unwarp → SHA-256 校驗。</p>
+    <table>
+      <thead><tr><th>維度</th><th>選項</th></tr></thead>
+      <tbody>
+        <tr><td>KDF</td><td>scrypt、sha256</td></tr>
+        <tr><td>encrypt_tail</td><td>False、True</td></tr>
+        <tr><td>encrypt_middle</td><td>False、True</td></tr>
+        <tr><td>Range CTR</td><td>none、auto-25%、auto-50%、manual b16/c64、manual b32/c128、manual b512/c512</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 2 — Copy 模式隨機（100 次）</h3>
+    <p>完全隨機：KDF、encrypt_size（256–8192 B）、tail、middle、range 模式與參數。</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 3 — base_folder（144 次）</h3>
+    <p>固定 + 隨機 base_folder 路徑，驗證輸出始終寫入 <code>filepath.parent</code>（base_folder 為保留參數）。</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 4 — is_warped()（100 次）</h3>
+    <p>30 個固定 + 70 個隨機情境，含：正確密碼、空密碼（觸發副檔名啟發）、非零錯誤密碼（XOR 遮罩不符→ False）、從尾部截斷的 .ks。</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 5 — 錯誤路徑（102 次）</h3>
+    <p>50 個固定 + 52 個隨機。分類：</p>
+    <ul>
+      <li><strong>控制組</strong>：正確密碼 → OK:</li>
+      <li><strong>錯誤密碼</strong>：空密碼 → ERR:；非空錯誤密碼 → SKIP:（XOR 遮罩不符）</li>
+      <li><strong>資料損壞</strong>：GCM 頭部損壞 → ERR:；未認證區域損壞（Copy 模式）→ OK:；Footer enc_magic 損壞 → SKIP:</li>
+      <li><strong>截斷</strong>：Copy 截斷 → OK:（GCM 頭完整）；In-place 截斷 → SKIP:（footer 損壞）</li>
+      <li><strong>已加密防護</strong>：重複加密 → SKIP:</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 6 — 邊界值（100 次）</h3>
+    <p>含：MIN_FILE_SIZE（1024 B）、encrypt_size = file_size、range_b_bytes = range_c_bytes（100% 覆蓋）、range_start = file_size − 1 等極端值。</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 7 — 資料夾功能（100 次）</h3>
+    <p>30 個固定 + 70 個隨機：rename_subfolders / restore_subfolders / cleanup_empty_subfolders 各種資料夾結構。</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 8 — 模式等效性（100 次）</h3>
+    <p>20 個固定 + 80 個隨機：對同一來源同時以 warp_file（Copy）與 warp_file_inplace（In-place）加密，解密後驗證兩者 SHA-256 均與原始一致。</p>
+  </div>
+  <div class="en">
+    <h3 style="color:var(--blue);margin:0 0 12px">Suite 1 — Copy Mode Full Matrix (144 runs)</h3>
+    <p>2 × 2 × 2 × 6 = 48 combos × 3 file sizes, covering all KDF / tail / middle / range permutations with warp → unwarp → SHA-256.</p>
+    <table>
+      <thead><tr><th>Dimension</th><th>Options</th></tr></thead>
+      <tbody>
+        <tr><td>KDF</td><td>scrypt, sha256</td></tr>
+        <tr><td>encrypt_tail</td><td>False, True</td></tr>
+        <tr><td>encrypt_middle</td><td>False, True</td></tr>
+        <tr><td>Range CTR</td><td>none, auto-25%, auto-50%, manual b16/c64, manual b32/c128, manual b512/c512</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 2 — Copy Mode Random (100 runs)</h3>
+    <p>Fully randomized: KDF, encrypt_size (256–8192 B), tail, middle, range mode and parameters.</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 3 — base_folder (144 runs)</h3>
+    <p>Fixed + random base_folder paths — verifies output always writes to <code>filepath.parent</code> (base_folder is a reserved parameter).</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 4 — is_warped() (100 runs)</h3>
+    <p>30 fixed + 70 random scenarios including: correct password, empty password (triggers extension heuristic), non-empty wrong password (XOR mask mismatch → False), and .ks files truncated from the end.</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 5 — Error Paths (102 runs)</h3>
+    <p>50 fixed + 52 random. Categories:</p>
+    <ul>
+      <li><strong>Control</strong>: correct password → OK:</li>
+      <li><strong>Wrong password</strong>: empty → ERR:; non-empty wrong → SKIP: (XOR mask mismatch)</li>
+      <li><strong>Corruption</strong>: GCM header flip → ERR:; unauthenticated area (copy mode) → OK:; footer enc_magic flip → SKIP:</li>
+      <li><strong>Truncation</strong>: copy truncation → OK: (GCM head intact); in-place truncation → SKIP: (footer damaged)</li>
+      <li><strong>Already-warped guard</strong>: double warp → SKIP:</li>
+    </ul>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 6 — Boundary Values (100 runs)</h3>
+    <p>Includes: MIN_FILE_SIZE (1024 B), encrypt_size = file_size, range_b_bytes = range_c_bytes (100% coverage), range_start = file_size − 1 and other extremes.</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 7 — Folder Functions (100 runs)</h3>
+    <p>30 fixed + 70 random: rename_subfolders / restore_subfolders / cleanup_empty_subfolders across various folder structures.</p>
+
+    <h3 style="color:var(--blue);margin:20px 0 12px">Suite 8 — Mode Equivalence (100 runs)</h3>
+    <p>20 fixed + 80 random: encrypt the same source with both warp_file (copy) and warp_file_inplace (in-place), verify both decrypted outputs match the original SHA-256.</p>
+  </div>
+</div>
+
+</section>
+
+</main>
+</div><!-- wrapper -->
+
+<!-- ===== Scripts ===== -->
+<script>
+// ── Language toggle ──────────────────────────────────────────────────────────
+function setLang(lang) {
+  document.body.classList.toggle('is-en', lang === 'en');
+  document.getElementById('btn-zh').classList.toggle('active', lang !== 'en');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  localStorage.setItem('kvhwarp_lang', lang);
+}
+(function() {
+  const saved = localStorage.getItem('kvhwarp_lang') || 'zh';
+  setLang(saved);
+})();
+
+// ── Active nav link on scroll ─────────────────────────────────────────────────
+const navLinks = document.querySelectorAll('nav a');
+const sections = document.querySelectorAll('section[id]');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id));
+    }
+  });
+}, { rootMargin: '-30% 0px -60% 0px' });
+sections.forEach(s => obs.observe(s));
+
+// ── SVG download helper ───────────────────────────────────────────────────────
+function exportSVG(id, filename) {
+  const svg = document.getElementById(id);
+  if (!svg) return;
+  const xml = new XMLSerializer().serializeToString(svg);
+  const blob = new Blob([xml], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+</script>
+
+<!-- reuse btn style from index.css via inline fallback -->
+<style>
+.btn {
+  display: inline-block;
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--blue);
+  font-size: .85rem;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--blue); }
+</style>
+
+</body>
+</html>
