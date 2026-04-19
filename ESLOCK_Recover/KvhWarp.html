@@ -107,7 +107,6 @@ KvhWarp.py (GUI)   KvhWarp_CLI.py (CLI)
         <tr><td><code>warp_file_inplace(path, pw, **opts)</code></td><td>In-place 模式加密（修改原始檔）</td></tr>
         <tr><td><code>unwarp_auto(path, pw)</code></td><td>自動偵測格式並解密</td></tr>
         <tr><td><code>rename_subfolders / restore_subfolders / cleanup_empty_dirs</code></td><td>資料夾混淆工具</td></tr>
-        <tr><td><code>_generate_hybrid_password(pw, path)</code></td><td>密碼增強（Enhancement）</td></tr>
         <tr><td><code>KDF_SCRYPT / KDF_SHA256 / ENCRYPT_SIZE / KS_EXT / _DEFAULTS</code></td><td>共用常數</td></tr>
       </tbody>
     </table>
@@ -148,7 +147,6 @@ KvhWarp.py (GUI)   KvhWarp_CLI.py (CLI)
         <tr><td><code>warp_file_inplace(path, pw, **opts)</code></td><td>In-place mode encryption (modifies original)</td></tr>
         <tr><td><code>unwarp_auto(path, pw)</code></td><td>Auto-detect format and decrypt</td></tr>
         <tr><td><code>rename_subfolders / restore_subfolders / cleanup_empty_dirs</code></td><td>Folder obfuscation helpers</td></tr>
-        <tr><td><code>_generate_hybrid_password(pw, path)</code></td><td>Password enhancement</td></tr>
         <tr><td><code>KDF_SCRYPT / KDF_SHA256 / ENCRYPT_SIZE / KS_EXT / _DEFAULTS</code></td><td>Shared constants</td></tr>
       </tbody>
     </table>
@@ -1111,7 +1109,6 @@ enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
         <tr><td><code>--range-b N</code></td><td>Manual: 每週期加密 N 個 unit</td></tr>
         <tr><td><code>--range-c N</code></td><td>Manual: 週期 N 個 unit</td></tr>
         <tr><td><code>--range-unit {B,KB,MB}</code></td><td>B/C 單位</td></tr>
-        <tr><td><code>--enhance</code></td><td>密碼增強：每個檔案以路徑衍生独立密鑰</td></tr>
       </tbody>
     </table>
   </div>
@@ -1145,7 +1142,6 @@ Commands:
         <tr><td><code>--range-b N</code></td><td>Manual: encrypt N units per period</td></tr>
         <tr><td><code>--range-c N</code></td><td>Manual: period is N units</td></tr>
         <tr><td><code>--range-unit {B,KB,MB}</code></td><td>Unit for B/C values</td></tr>
-        <tr><td><code>--enhance</code></td><td>Password enhancement: derive per-file key from path + password</td></tr>
       </tbody>
     </table>
   </div>
