@@ -24,6 +24,7 @@
   <a href="#crypto">       <span class="zhi">加密模型</span>          <span class="eni">Encryption Model</span></a>
   <a href="#eslock-compat"> <span class="zhi">ESLock 相容性</span>    <span class="eni">ESLock Compatibility</span></a>
   <a href="#eslock-partial"><span class="zhi">部分加密</span>          <span class="eni">Partial Encryption</span></a>
+  <a href="#eslock-recovery"><span class="zhi">ESLock 復原工具</span>  <span class="eni">ESLock Recovery</span></a>
   <a href="#kvh-design">   <span class="zhi">KVH 設計目標</span>     <span class="eni">KVH Design Goals</span></a>
   <a href="#eslock-flow">  <span class="zhi">ESLock 加密流程</span>  <span class="eni">ESLock Flow</span></a>
   <a href="#kvh-flow">     <span class="zhi">KVH 加密流程</span>    <span class="eni">KVH Crypto Flow</span></a>
@@ -463,6 +464,593 @@ Cipher = AES-CFB-128(Key, IV=[0x00..0x0F])</pre>
 </div>
 </section>
 
+<!-- ===== ESLock Recovery ===== -->
+<section id="eslock-recovery">
+<div class="icon-title">🔓 <span class="zhi">ESLock Recovery 工具</span><span class="eni">ESLock Recovery Tool</span></div>
+<div class="divider"></div>
+<div class="panel">
+
+  <!-- ── Algorithm ── -->
+  <div class="zh">
+    <h3 style="color:var(--blue);margin:0 0 12px">ES 檔案瀏覽器加密演算法</h3>
+    <p>ES 檔案瀏覽器使用 <strong>AES-128-CFB</strong>（密碼回饋模式，128 位元區段）搭配一個<em>固定的</em>初始向量（IV）來加密檔案。加密後的輸出以 <code>.eslock</code> 副檔名儲存。</p>
+
+    <h4 style="color:#fff;margin:20px 0 8px">金鑰推導</h4>
+    <pre>密碼（UTF-8 字串）
+     │
+     ▼
+  MD5 雜湊（16 位元組）
+     │
+     ▼
+  AES-128 金鑰（MD5 摘要的前 16 位元組）</pre>
+    <ul>
+      <li>使用者密碼以 <strong>MD5</strong> 進行雜湊</li>
+      <li>完整 16 位元組摘要直接作為 AES 金鑰</li>
+      <li>沒有鹽值、沒有迭代次數、沒有金鑰延展（<strong>未使用</strong> PBKDF2 / scrypt / Argon2）</li>
+    </ul>
+
+    <h4 style="color:#fff;margin:20px 0 8px">完整加密（小檔案）</h4>
+    <svg viewBox="0 0 400 300" width="100%" style="max-width:400px;display:block;font-family:system-ui" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="fa1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/></marker></defs>
+      <!-- Original file box -->
+      <rect x="60" y="10" width="280" height="56" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="200" y="34" font-size="14" fill="#e5e7eb" text-anchor="middle">原始檔案</text>
+      <text x="200" y="54" font-size="12" fill="#9aa4b2" text-anchor="middle">（所有位元組）</text>
+      <!-- arrow -->
+      <line x1="200" y1="66" x2="200" y2="86" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#fa1)"/>
+      <!-- cipher info -->
+      <text x="200" y="102" font-size="12" fill="#9aa4b2" text-anchor="middle">AES-128-CFB 串流加密</text>
+      <text x="200" y="118" font-size="11" fill="#60a5fa" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">IV  = [0x00, 0x01, 0x02 … 0x0F]</text>
+      <text x="200" y="134" font-size="11" fill="#60a5fa" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">Key = MD5(密碼)</text>
+      <!-- arrow -->
+      <line x1="200" y1="142" x2="200" y2="162" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#fa1)"/>
+      <!-- output box -->
+      <rect x="60" y="162" width="280" height="44" rx="0" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="200" y="189" font-size="14" fill="#e5e7eb" text-anchor="middle">加密後內容</text>
+      <rect x="60" y="206" width="280" height="44" rx="0" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="200" y="225" font-size="13" fill="#34d399" text-anchor="middle">Footer</text>
+      <text x="200" y="242" font-size="11" fill="#9aa4b2" text-anchor="middle">（中繼資料 + 金鑰 + CRC）</text>
+      <!-- output label -->
+      <text x="200" y="272" font-size="12" fill="#9aa4b2" text-anchor="middle">輸出：</text>
+      <text x="245" y="272" font-size="12" fill="#60a5fa" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">file.eslock</text>
+    </svg>
+
+    <h4 style="color:#fff;margin:20px 0 8px">部分加密（大檔案）</h4>
+    <svg viewBox="0 0 600 320" width="100%" style="display:block;font-family:system-ui" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="fa2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/></marker></defs>
+      <!-- Top row: 3 blocks -->
+      <rect x="0"   y="10" width="160" height="56" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="80"  y="34" font-size="13" fill="#e5e7eb" text-anchor="middle">前段區塊</text>
+      <text x="80"  y="52" font-size="11" fill="#9aa4b2" text-anchor="middle">（1024 位元組）</text>
+      <rect x="160" y="10" width="280" height="56" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.5"/>
+      <text x="300" y="34" font-size="13" fill="#64748b" text-anchor="middle">中段</text>
+      <text x="300" y="52" font-size="11" fill="#475569" text-anchor="middle">（明文）</text>
+      <rect x="440" y="10" width="160" height="56" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="520" y="34" font-size="13" fill="#e5e7eb" text-anchor="middle">後段區塊</text>
+      <text x="520" y="52" font-size="11" fill="#9aa4b2" text-anchor="middle">（1024 位元組）</text>
+      <!-- arrows down from head/tail -->
+      <line x1="80"  y1="66" x2="80"  y2="100" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#fa2)"/>
+      <line x1="520" y1="66" x2="520" y2="100" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#fa2)"/>
+      <!-- cipher labels -->
+      <text x="80"  y="116" font-size="12" fill="#9aa4b2" text-anchor="middle">AES-CFB 加密</text>
+      <text x="80"  y="132" font-size="11" fill="#9aa4b2" text-anchor="middle">（全新加密器）</text>
+      <text x="520" y="116" font-size="12" fill="#9aa4b2" text-anchor="middle">AES-CFB 加密</text>
+      <text x="520" y="132" font-size="11" fill="#9aa4b2" text-anchor="middle">（全新加密器）</text>
+      <!-- arrows down to bottom row -->
+      <line x1="80"  y1="138" x2="80"  y2="168" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#fa2)"/>
+      <line x1="520" y1="138" x2="520" y2="168" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#fa2)"/>
+      <!-- Bottom row -->
+      <rect x="0"   y="168" width="160" height="56" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="80"  y="192" font-size="12" fill="#e5e7eb" text-anchor="middle">加密後的</text>
+      <text x="80"  y="210" font-size="12" fill="#e5e7eb" text-anchor="middle">前段區塊</text>
+      <rect x="160" y="168" width="280" height="56" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.5"/>
+      <text x="300" y="192" font-size="12" fill="#64748b" text-anchor="middle">明文（直接透傳，</text>
+      <text x="300" y="210" font-size="12" fill="#64748b" text-anchor="middle">未經處理）</text>
+      <rect x="440" y="168" width="160" height="56" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="520" y="192" font-size="12" fill="#e5e7eb" text-anchor="middle">加密後的</text>
+      <text x="520" y="210" font-size="12" fill="#e5e7eb" text-anchor="middle">後段區塊</text>
+      <!-- Footer row -->
+      <rect x="0"   y="224" width="600" height="44" rx="0" fill="#1a2e1a" stroke="#34d399" stroke-width="1.5"/>
+      <text x="300" y="251" font-size="14" fill="#34d399" text-anchor="middle">Footer</text>
+    </svg>
+    <ul>
+      <li>預設<strong>區塊大小 = 1024 位元組</strong></li>
+      <li>僅加密<strong>前端</strong>和<strong>後端</strong>各 1024 位元組</li>
+      <li>檔案<strong>中段保持為明文</strong></li>
+      <li>每個區塊使用<strong>全新的加密器</strong>（相同金鑰 + 相同 IV）</li>
+    </ul>
+
+    <h4 style="color:#fff;margin:20px 0 8px">Footer 結構</h4>
+    <p>Footer 附加在加密內容之後，最後 4 個位元組始終存放 footer 長度。</p>
+    <table>
+      <thead><tr><th>欄位</th><th>大小</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>加密旗標</code></td><td>1 B</td><td><code>0xFF</code> = 完整加密；其他 = 部分加密</td></tr>
+        <tr><td><code>區塊大小</code></td><td>4 B（大端序）</td><td>僅在部分加密時存在</td></tr>
+        <tr><td><code>檔名長度</code></td><td>1 B</td><td><code>0xFF</code> = 未儲存檔名</td></tr>
+        <tr><td><code>加密的檔名</code></td><td>可變長度</td><td>AES-CFB 加密，使用相同金鑰</td></tr>
+        <tr><td><code>金鑰前綴魔術位元組</code></td><td>1 B</td><td>固定為 <code>0x10</code></td></tr>
+        <tr><td style="color:var(--red);font-weight:700">★ AES 金鑰 ★</td><td>16 B</td><td style="color:var(--red)">解密金鑰，以<strong>明文</strong>儲存</td></tr>
+        <tr><td><code>金鑰後綴魔術位元組</code></td><td>1 B</td><td><code>0x00</code> 或 <code>0x02</code></td></tr>
+        <tr><td><code>CRC 填充</code></td><td>4 B</td><td>全為零</td></tr>
+        <tr><td><code>儲存的 CRC32</code></td><td>4 B（大端序）</td><td>CRC 區段之前的 footer 位元組之 CRC</td></tr>
+        <tr><td><code>Footer 長度</code></td><td>4 B（大端序）</td><td>包含此欄位在內的 footer 總長度</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">漏洞——為什麼能夠復原</h3>
+    <div class="warn-box"><strong>AES 解密金鑰以明文形式儲存在加密檔案本身之中。</strong></div>
+    <blockquote><code>.eslock</code> 格式更接近<strong>混淆</strong>而非加密。被「鎖定」的檔案攜帶著自己的鑰匙——就像一個上了鎖的箱子，卻把鑰匙貼在箱子外面。</blockquote>
+    <table>
+      <thead><tr><th>弱點</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-red">嚴重</span>&ensp;金鑰儲存在檔案中</td><td>16 位元組的 AES 金鑰位於魔術位元組 <code>0x10</code> 和 <code>0x00</code>/<code>0x02</code> 之間。任何能讀取檔案的人都可以提取它。</td></tr>
+        <tr><td><span class="badge badge-red">嚴重</span>&ensp;不需要密碼</td><td>因為金鑰在 footer 中，使用者的密碼<strong>完全不需要</strong>即可解密。</td></tr>
+        <tr><td><span class="badge badge-yellow">高</span>&ensp;弱金鑰推導</td><td><code>MD5(密碼)</code> — 沒有鹽值、沒有迭代。即使金鑰沒有嵌入，密碼也能被輕易暴力破解。</td></tr>
+        <tr><td><span class="badge badge-yellow">高</span>&ensp;固定 IV</td><td><code>IV = [0, 1, 2, …, 15]</code> — 每個檔案、每個區塊都使用相同 IV，破壞 CFB 語義安全性。</td></tr>
+        <tr><td><span class="badge badge-yellow">高</span>&ensp;部分加密洩漏資料</td><td>在部分加密模式下，檔案中段全部為明文，媒體檔案內容大部分可直接檢視。</td></tr>
+        <tr><td><span class="badge badge-yellow">中</span>&ensp;僅有 CRC，無 MAC</td><td>CRC32 驗證結構完整性，<strong>而非</strong>檔案真實性，沒有 HMAC 或 AEAD。</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">復原流程</h3>
+    <svg id="svgRecoveryZh" viewBox="0 0 520 930" width="100%" style="max-width:520px;display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="rhArr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/>
+        </marker>
+      </defs>
+      <!-- shared style shortcuts via inline attrs -->
+
+      <!-- 0: Start CLI -->
+      <rect x="170" y="10"  width="160" height="44" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="250" y="37" font-family="system-ui" font-size="14" fill="#e5e7eb" text-anchor="middle">啟動 CLI</text>
+
+      <!-- arrow 0→1 -->
+      <line x1="250" y1="54"  x2="250" y2="74"  stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 1: Scan -->
+      <rect x="160" y="74"  width="180" height="56" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="250" y="98"  font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">掃描輸入路徑</text>
+      <text x="250" y="118" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">尋找 *.eslock</text>
+
+      <!-- arrow 1→2 -->
+      <line x1="250" y1="130" x2="250" y2="150" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 2: For each -->
+      <rect x="100" y="150" width="300" height="44" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="250" y="177" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">對每個 .eslock 檔案</text>
+
+      <!-- arrow 2→3 -->
+      <line x1="250" y1="194" x2="250" y2="214" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 3: Read footer length -->
+      <rect x="120" y="214" width="260" height="56" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="250" y="238" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">讀取最後 4 位元組</text>
+      <text x="250" y="258" font-family="system-ui" font-size="13" fill="#60a5fa"  text-anchor="middle">→ footer_length</text>
+
+      <!-- arrow 3→4 -->
+      <line x1="250" y1="270" x2="250" y2="290" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 4: Valid length? diamond-ish rect -->
+      <rect x="155" y="290" width="190" height="44" rx="4" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+      <text x="250" y="317" font-family="system-ui" font-size="13" fill="#facc15" text-anchor="middle">長度有效？</text>
+
+      <!-- YES label + arrow down -->
+      <text x="218" y="356" font-family="system-ui" font-size="12" fill="#34d399">是</text>
+      <line x1="250" y1="334" x2="250" y2="374" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- NO label + arrow right to heuristic -->
+      <text x="358" y="314" font-family="system-ui" font-size="12" fill="#f87171">否</text>
+      <line x1="345" y1="312" x2="380" y2="312" stroke="#60a5fa" stroke-width="1.5"/>
+      <line x1="380" y1="312" x2="380" y2="374" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 4b: heuristic box -->
+      <rect x="350" y="374" width="155" height="66" rx="4" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+      <text x="427" y="398" font-family="system-ui" font-size="12" fill="#facc15" text-anchor="middle">--heuristic?</text>
+      <text x="427" y="416" font-family="system-ui" font-size="12" fill="#e5e7eb" text-anchor="middle">掃描最後 128KB</text>
+      <text x="427" y="432" font-family="system-ui" font-size="12" fill="#e5e7eb" text-anchor="middle">尋找特徵碼</text>
+
+      <!-- heuristic arrow down to parse -->
+      <line x1="380" y1="440" x2="380" y2="460" stroke="#60a5fa" stroke-width="1.5"/>
+      <line x1="380" y1="460" x2="270" y2="460" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 5: Parse footer -->
+      <rect x="60"  y="374" width="270" height="86" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="195" y="400" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">解析 footer 結構</text>
+      <text x="195" y="420" font-family="system-ui" font-size="12" fill="#9aa4b2" text-anchor="middle">提取：金鑰、CRC、</text>
+      <text x="195" y="438" font-family="system-ui" font-size="12" fill="#9aa4b2" text-anchor="middle">加密模式、區塊大小、</text>
+      <text x="195" y="455" font-family="system-ui" font-size="12" fill="#9aa4b2" text-anchor="middle">加密檔名</text>
+
+      <!-- arrow 5→6 -->
+      <line x1="195" y1="460" x2="195" y2="480" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 6: CRC valid? -->
+      <rect x="115" y="480" width="160" height="44" rx="4" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+      <text x="195" y="507" font-family="system-ui" font-size="13" fill="#facc15" text-anchor="middle">CRC 有效？</text>
+
+      <!-- YES label + arrow down -->
+      <text x="160" y="546" font-family="system-ui" font-size="12" fill="#34d399">是</text>
+      <line x1="195" y1="524" x2="195" y2="614" stroke="#60a5fa" stroke-width="1.5"/>
+
+      <!-- NO label + arrow right to ignore-crc -->
+      <text x="290" y="504" font-family="system-ui" font-size="12" fill="#f87171">否</text>
+      <line x1="275" y1="502" x2="310" y2="502" stroke="#60a5fa" stroke-width="1.5"/>
+      <line x1="310" y1="502" x2="310" y2="544" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 6b: ignore-crc box -->
+      <rect x="270" y="544" width="160" height="44" rx="4" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+      <text x="350" y="571" font-family="system-ui" font-size="13" fill="#facc15" text-anchor="middle">--ignore-crc?</text>
+
+      <!-- YES from ignore-crc → down to merge -->
+      <text x="268" y="594" font-family="system-ui" font-size="12" fill="#34d399">是</text>
+      <line x1="290" y1="588" x2="290" y2="614" stroke="#60a5fa" stroke-width="1.5"/>
+      <line x1="290" y1="614" x2="215" y2="614" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- NO → skip label -->
+      <text x="438" y="572" font-family="system-ui" font-size="12" fill="#f87171">否 → 跳過</text>
+      <line x1="430" y1="566" x2="445" y2="566" stroke="#60a5fa" stroke-width="1.5"/>
+
+      <!-- 7: Extract key (merge point) -->
+      <line x1="195" y1="614" x2="195" y2="624" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+      <rect x="100" y="624" width="230" height="56" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="215" y="648" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">從 footer 提取</text>
+      <text x="215" y="668" font-family="system-ui" font-size="13" fill="#60a5fa"  text-anchor="middle">16 位元組 AES 金鑰</text>
+
+      <!-- arrow 7→8 -->
+      <line x1="215" y1="680" x2="215" y2="700" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 8: Decrypt filename -->
+      <rect x="90"  y="700" width="250" height="56" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="215" y="724" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">解密原始檔名</text>
+      <text x="215" y="744" font-family="system-ui" font-size="12" fill="#9aa4b2" text-anchor="middle">（如果有的話）</text>
+
+      <!-- arrow 8→9 -->
+      <line x1="215" y1="756" x2="215" y2="776" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 9: Decrypt content -->
+      <rect x="70"  y="776" width="290" height="76" rx="4" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="215" y="800" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">解密檔案內容：</text>
+      <text x="215" y="818" font-family="system-ui" font-size="12" fill="#9aa4b2" text-anchor="middle">完整 → AES-CFB 整個串流</text>
+      <text x="215" y="836" font-family="system-ui" font-size="12" fill="#9aa4b2" text-anchor="middle">部分 → 前段 + 後段區塊</text>
+
+      <!-- arrow 9→10 -->
+      <line x1="215" y1="852" x2="215" y2="866" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#rhArr)"/>
+
+      <!-- 10: Write output... reuse box from en version  -->
+      <!-- merged into done for space — write + done -->
+      <rect x="100" y="866" width="230" height="56" rx="4" fill="#020617" stroke="#34d399" stroke-width="1.5"/>
+      <text x="215" y="890" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">寫入復原後的檔案</text>
+      <text x="215" y="910" font-family="system-ui" font-size="13" fill="#34d399" text-anchor="middle">至輸出目錄 ✓</text>
+    </svg>
+    <button class="btn" style="margin-top:10px" onclick="exportSVG('svgRecoveryZh','recovery_flow_zh.svg')">⬇ 下載 SVG</button>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">環境需求</h3>
+    <table>
+      <thead><tr><th>套件</th><th>版本</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Python</strong></td><td>≥ 3.8</td><td>執行環境</td></tr>
+        <tr><td><strong>pycryptodome</strong></td><td>≥ 3.9</td><td>AES-128-CFB 解密</td></tr>
+      </tbody>
+    </table>
+    <p>使用的標準函式庫模組：<code>argparse</code>、<code>hashlib</code>、<code>os</code>、<code>struct</code>、<code>sys</code>、<code>zlib</code>、<code>datetime</code>、<code>pathlib</code>、<code>typing</code></p>
+    <pre><code>pip install pycryptodome</code></pre>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">使用方法</h3>
+    <pre><code># 復原目前目錄下所有 .eslock 檔案
+python ESLOCK_Recovery.py
+
+# 復原單一檔案
+python ESLOCK_Recovery.py photo.eslock
+
+# 將目錄復原至指定輸出資料夾
+python ESLOCK_Recovery.py ./encrypted ./recovered
+
+# 使用啟發式搜尋處理損壞的檔案
+python ESLOCK_Recovery.py --heuristic ./damaged
+
+# 忽略 CRC 不符強制復原
+python ESLOCK_Recovery.py --ignore-crc ./files
+
+# 覆寫已存在的輸出檔案
+python ESLOCK_Recovery.py --overwrite ./files ./output</code></pre>
+    <table>
+      <thead><tr><th>參數</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>input</code></td><td>要復原的檔案或目錄（預設：目前目錄）</td></tr>
+        <tr><td><code>output</code></td><td>目的地目錄（預設：自動建立 <code>recovered-YYYYMMDD-HHMMSS</code>）</td></tr>
+        <tr><td><code>--overwrite</code></td><td>覆寫已存在的輸出檔案</td></tr>
+        <tr><td><code>--ignore-crc</code></td><td>即使 footer CRC 檢查失敗仍繼續處理</td></tr>
+        <tr><td><code>--heuristic</code></td><td>使用啟發式 footer 搜尋（適用於損壞／截斷的檔案）</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">函式參考</h3>
+    <p style="color:var(--muted);font-weight:600">密碼學</p>
+    <table>
+      <thead><tr><th>函式</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>_make_aes(key)</code></td><td>使用固定 IV <code>[0..15]</code> 建立 AES-128-CFB 加密器</td></tr>
+        <tr><td><code>decrypt_stream(…)</code></td><td>解密檔案本體——處理完整及部分加密模式</td></tr>
+        <tr><td><code>decrypt_file_name(…)</code></td><td>解密儲存在 footer 中的原始檔名（補齊至 16 位元組邊界）</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--muted);font-weight:600;margin-top:12px">Footer 解析</p>
+    <table>
+      <thead><tr><th>函式</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>read_footer_standard(path)</code></td><td>快速讀取器——讀取最後 1024 位元組，從宣告的長度欄位解析</td></tr>
+        <tr><td><code>read_footer_heuristic(path)</code></td><td>容錯讀取器——掃描最後 128 KB 尋找特徵碼與結構模式</td></tr>
+        <tr><td><code>_seq_parse(buf, total, offset)</code></td><td>在指定的緩衝區偏移量嘗試解析 footer（由啟發式掃描器使用）</td></tr>
+        <tr><td><code>_read_tail(path, length)</code></td><td>讀取檔案的最後 N 個位元組</td></tr>
+        <tr><td><code>_crc32(data)</code></td><td>計算無號 32 位元 CRC32</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--muted);font-weight:600;margin-top:12px">復原</p>
+    <table>
+      <thead><tr><th>函式</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>_recover_one(…)</code></td><td>核心函式：讀取 footer → 提取金鑰 → 驗證 CRC → 解密 → 寫入輸出</td></tr>
+        <tr><td><code>main()</code></td><td>CLI 進入點：解析參數、收集檔案、執行復原、列印摘要</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--muted);font-weight:600;margin-top:12px">資料模型</p>
+    <table>
+      <thead><tr><th>類別</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>EslockFooter</code></td><td>儲存所有已解析的 footer 欄位：<code>key</code>、<code>is_partial_encryption</code>、<code>encrypted_block_size</code>、<code>encrypted_original_name</code>、<code>stored_crc</code>、<code>calculated_crc</code>、<code>footer_offset</code>、<code>footer_length</code>。屬性 <code>is_crc_valid</code> 檢查 CRC 是否吻合。</td></tr>
+      </tbody>
+    </table>
+  </div><!-- /.zh -->
+
+  <div class="en">
+    <h3 style="color:var(--blue);margin:0 0 12px">ES File Explorer Encryption Algorithm</h3>
+    <p>ES File Explorer uses <strong>AES-128-CFB</strong> (Cipher Feedback Mode, 128-bit segment) with a <em>fixed</em> initialisation vector to encrypt files. The encrypted output is saved with the <code>.eslock</code> extension.</p>
+
+    <h4 style="color:#fff;margin:20px 0 8px">Key Derivation</h4>
+    <pre>Password  (UTF-8 string)
+     │
+     ▼
+  MD5 hash  (16 bytes)
+     │
+     ▼
+  AES-128 key  (first 16 bytes of MD5 digest)</pre>
+    <ul>
+      <li>The user password is hashed with <strong>MD5</strong></li>
+      <li>The full 16-byte digest is used directly as the AES key</li>
+      <li>No salt, no iterations, no key stretching (PBKDF2 / scrypt / Argon2 is <strong>not</strong> used)</li>
+    </ul>
+
+    <h4 style="color:#fff;margin:20px 0 8px">Full Encryption (small files)</h4>
+    <pre>┌─────────────────────────────────┐
+│         Original File           │
+│       (all bytes)               │
+└────────────────┬────────────────┘
+                 │
+                 ▼
+   AES-128-CFB  encrypt  (stream)
+   IV  = [0x00, 0x01, 0x02 … 0x0F]
+   Key = MD5(password)
+                 │
+                 ▼
+┌─────────────────────────────────┐
+│       Encrypted Content         │
+├─────────────────────────────────┤
+│            Footer               │
+│   (metadata + KEY + CRC)        │
+└─────────────────────────────────┘
+           output: file.eslock</pre>
+
+    <h4 style="color:#fff;margin:20px 0 8px">Partial Encryption (large files)</h4>
+    <pre>┌──────────────┬───────────────────────┬──────────────┐
+│  First Block │     Middle Section    │  Last Block  │
+│  (1024 B)    │     (plaintext)       │  (1024 B)    │
+└──────┬───────┴───────────────────────┴──────┬───────┘
+       │                                      │
+       ▼                                      ▼
+  AES-CFB encrypt                        AES-CFB encrypt
+  (fresh cipher)                         (fresh cipher)
+       │                                      │
+       ▼                                      ▼
+┌──────────────┬───────────────────────┬──────────────┐
+│  Encrypted   │  Plaintext (pass-     │  Encrypted   │
+│  First Block │  through, untouched)  │  Last Block  │
+├──────────────┴───────────────────────┴──────────────┤
+│                       Footer                         │
+└──────────────────────────────────────────────────────┘</pre>
+    <ul>
+      <li>Default <strong>block size = 1024 bytes</strong></li>
+      <li>Only the <strong>first</strong> and <strong>last</strong> 1024-byte blocks are encrypted</li>
+      <li>The <strong>middle</strong> of the file remains <strong>plaintext</strong></li>
+      <li>Each block gets a <strong>fresh cipher</strong> (same key + same IV)</li>
+    </ul>
+
+    <h4 style="color:#fff;margin:20px 0 8px">Footer Structure</h4>
+    <p>The footer is appended after the encrypted content. The last 4 bytes always hold the footer length.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Size</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>Encryption flag</code></td><td>1 B</td><td><code>0xFF</code> = full encryption; other = partial</td></tr>
+        <tr><td><code>Block size</code></td><td>4 B (BE)</td><td>Only present if partial encryption</td></tr>
+        <tr><td><code>Name length</code></td><td>1 B</td><td><code>0xFF</code> = name not stored</td></tr>
+        <tr><td><code>Encrypted filename</code></td><td>variable</td><td>AES-CFB encrypted, same key</td></tr>
+        <tr><td><code>Key prefix magic</code></td><td>1 B</td><td>Always <code>0x10</code></td></tr>
+        <tr><td style="color:var(--red);font-weight:700">★ AES KEY ★</td><td>16 B</td><td style="color:var(--red)">The decryption key, stored in <strong>plaintext</strong></td></tr>
+        <tr><td><code>Key postfix magic</code></td><td>1 B</td><td><code>0x00</code> or <code>0x02</code></td></tr>
+        <tr><td><code>CRC padding</code></td><td>4 B</td><td>All zeros</td></tr>
+        <tr><td><code>Stored CRC32</code></td><td>4 B (BE)</td><td>CRC of footer bytes before the CRC section</td></tr>
+        <tr><td><code>Footer length</code></td><td>4 B (BE)</td><td>Total footer size (including this field)</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">The Loophole — Why Recovery Is Possible</h3>
+    <div class="warn-box"><strong>The AES decryption key is stored in plaintext inside the encrypted file itself.</strong></div>
+    <blockquote>The <code>.eslock</code> format is closer to <strong>obfuscation</strong> than encryption. The &ldquo;locked&rdquo; file carries its own key &mdash; like a padlocked box with the key taped to the outside.</blockquote>
+    <table>
+      <thead><tr><th>Weakness</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-red">Critical</span>&ensp;Key stored in file</td><td>The 16-byte AES key sits between magic bytes <code>0x10</code> and <code>0x00</code>/<code>0x02</code>. Anyone who can read the file can extract it.</td></tr>
+        <tr><td><span class="badge badge-red">Critical</span>&ensp;No password needed</td><td>Because the key is in the footer, the user's password is <strong>never required</strong> for decryption.</td></tr>
+        <tr><td><span class="badge badge-yellow">High</span>&ensp;Weak key derivation</td><td><code>MD5(password)</code> — no salt, no iterations. Trivially brute-forceable even without the embedded key.</td></tr>
+        <tr><td><span class="badge badge-yellow">High</span>&ensp;Fixed IV</td><td><code>IV = [0, 1, 2, …, 15]</code> — the same IV for every file, every block. Breaks CFB semantic security.</td></tr>
+        <tr><td><span class="badge badge-yellow">High</span>&ensp;Partial encryption leaks data</td><td>In partial mode the entire middle of the file is plaintext. Media files are largely viewable.</td></tr>
+        <tr><td><span class="badge badge-yellow">Medium</span>&ensp;CRC only, no MAC</td><td>CRC32 verifies structure integrity, <strong>not</strong> file authenticity. No HMAC or AEAD.</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">Recovery Flow</h3>
+    <pre>                    ┌──────────────┐
+                    │  Start CLI   │
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │ Scan input   │
+                    │ for *.eslock │
+                    └──────┬───────┘
+                           │
+              ┌────────────▼────────────┐
+              │  For each .eslock file  │
+              └────────────┬────────────┘
+                           │
+                ┌──────────▼──────────┐
+                │ Read last 4 bytes   │
+                │ → footer_length     │
+                └──────────┬──────────┘
+                           │
+                   ┌───────▼────────┐  No
+                   │ Valid length?  ├──────┐
+                   └───────┬────────┘      │
+                      Yes  │          ┌────▼────────────┐
+                           │          │ --heuristic?    │
+                           │          │ Scan last 128KB │
+                           │          │ for signatures  │
+                           │          └────┬────────────┘
+                           │               │
+                ┌──────────▼───────────────▼┐
+                │  Parse footer structure   │
+                │  Extract: key, CRC,       │
+                │  enc_mode, block_size,    │
+                │  encrypted filename       │
+                └──────────┬────────────────┘
+                           │
+                   ┌───────▼────────┐
+                   │  CRC valid?    │
+                   └──┬──────────┬──┘
+                  Yes │          │ No
+                      │    ┌─────▼──────────┐
+                      │    │ --ignore-crc?  │
+                      │    └──┬──────────┬──┘
+                      │   Yes │      No → SKIP
+                      │       │
+                ┌─────▼───────▼──┐
+                │ Extract 16-byte│
+                │ AES key from   │
+                │ footer         │
+                └───────┬────────┘
+                        │
+              ┌─────────▼─────────┐
+              │ Decrypt original  │
+              │ filename (if any) │
+              └─────────┬─────────┘
+                        │
+              ┌─────────▼─────────┐
+              │ Decrypt content:  │
+              │ Full → AES-CFB    │
+              │   entire stream   │
+              │ Partial → first + │
+              │   last blocks     │
+              └─────────┬─────────┘
+                        │
+              ┌─────────▼─────────┐
+              │ Write recovered   │
+              │ file to output    │
+              └─────────┬─────────┘
+                        │
+                  ┌─────▼──┐
+                  │  Done  │
+                  └────────┘</pre>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">Requirements</h3>
+    <table>
+      <thead><tr><th>Package</th><th>Version</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Python</strong></td><td>≥ 3.8</td><td>Runtime</td></tr>
+        <tr><td><strong>pycryptodome</strong></td><td>≥ 3.9</td><td>AES-128-CFB decryption</td></tr>
+      </tbody>
+    </table>
+    <p>Standard library modules: <code>argparse</code>, <code>hashlib</code>, <code>os</code>, <code>struct</code>, <code>sys</code>, <code>zlib</code>, <code>datetime</code>, <code>pathlib</code>, <code>typing</code></p>
+    <pre><code>pip install pycryptodome</code></pre>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">Usage</h3>
+    <pre><code># Recover all .eslock files in the current directory
+python ESLOCK_Recovery.py
+
+# Recover a single file
+python ESLOCK_Recovery.py photo.eslock
+
+# Recover a directory to a specific output folder
+python ESLOCK_Recovery.py ./encrypted ./recovered
+
+# Handle corrupted files with heuristic search
+python ESLOCK_Recovery.py --heuristic ./damaged
+
+# Force recovery despite CRC mismatches
+python ESLOCK_Recovery.py --ignore-crc ./files
+
+# Overwrite existing output files
+python ESLOCK_Recovery.py --overwrite ./files ./output</code></pre>
+    <table>
+      <thead><tr><th>Argument</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>input</code></td><td>File or directory to recover (default: current directory)</td></tr>
+        <tr><td><code>output</code></td><td>Destination directory (default: auto-created <code>recovered-YYYYMMDD-HHMMSS</code>)</td></tr>
+        <tr><td><code>--overwrite</code></td><td>Overwrite existing output files</td></tr>
+        <tr><td><code>--ignore-crc</code></td><td>Proceed even if footer CRC check fails</td></tr>
+        <tr><td><code>--heuristic</code></td><td>Use heuristic footer search (for corrupted/truncated files)</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="color:var(--blue);margin:28px 0 12px">Function Reference</h3>
+    <p style="color:var(--muted);font-weight:600">Cryptography</p>
+    <table>
+      <thead><tr><th>Function</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>_make_aes(key)</code></td><td>Creates an AES-128-CFB cipher with fixed IV <code>[0..15]</code></td></tr>
+        <tr><td><code>decrypt_stream(…)</code></td><td>Decrypts file body — full or partial mode</td></tr>
+        <tr><td><code>decrypt_file_name(…)</code></td><td>Decrypts the original filename (padded to 16-byte boundary)</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--muted);font-weight:600;margin-top:12px">Footer Parsing</p>
+    <table>
+      <thead><tr><th>Function</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>read_footer_standard(path)</code></td><td>Fast reader — reads last 1024 bytes, parses from declared length</td></tr>
+        <tr><td><code>read_footer_heuristic(path)</code></td><td>Resilient reader — scans last 128 KB for signatures &amp; structural patterns</td></tr>
+        <tr><td><code>_seq_parse(buf, total, offset)</code></td><td>Attempts footer parse at a given buffer offset (used by heuristic)</td></tr>
+        <tr><td><code>_read_tail(path, length)</code></td><td>Reads the last N bytes of a file</td></tr>
+        <tr><td><code>_crc32(data)</code></td><td>Computes unsigned 32-bit CRC32</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--muted);font-weight:600;margin-top:12px">Recovery</p>
+    <table>
+      <thead><tr><th>Function</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>_recover_one(…)</code></td><td>Core: read footer → extract key → validate CRC → decrypt → write output</td></tr>
+        <tr><td><code>main()</code></td><td>CLI entry point: parse args, collect files, run recovery, print summary</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--muted);font-weight:600;margin-top:12px">Data Model</p>
+    <table>
+      <thead><tr><th>Class</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>EslockFooter</code></td><td>Holds parsed footer fields: <code>key</code>, <code>is_partial_encryption</code>, <code>encrypted_block_size</code>, <code>encrypted_original_name</code>, <code>stored_crc</code>, <code>calculated_crc</code>, <code>footer_offset</code>, <code>footer_length</code>. Property <code>is_crc_valid</code> checks CRC match.</td></tr>
+      </tbody>
+    </table>
+  </div><!-- /.en -->
+
+</div>
+</section>
+
 <!-- ===== KVH Design Goals ===== -->
 <section id="kvh-design">
 <div class="icon-title">🔒 <span class="zhi">KVH Locker 設計理念</span><span class="eni">KVH Locker Design Goals</span></div>
@@ -493,26 +1081,84 @@ Cipher = AES-CFB-128(Key, IV=[0x00..0x0F])</pre>
       </tbody>
     </table>
 
-    <p style="margin-top:24px"><b>KVH 金鑰層級架構</b></p>
-    <pre>User Password
-   ↓ PBKDF2-HMAC-SHA256
-   ↓   salt = random 16 bytes
-   ↓   iterations = 600,000
-   ↓   dkLen = 32 bytes
-Master Key (32 bytes)
-   ↓ SHA256(Master Key + IV)
-File Key (32 bytes)
-   ↓ AES-256-CFB, IV = random 16 bytes
-Encrypted Ciphertext
-   ↓ HMAC-SHA256(File Key, Ciphertext)
-Auth Tag (32 bytes) → appended to file</pre>
+    <p style="margin-top:24px"><b>KVH 金鑰層級架構</b>（見下方圖示）</p>
+    <p><b>實際檔案格式（標頭混淆佈局）</b>（見下方圖示）</p>
+    <p class="muted-note">鹽值與加密標頭以隨機位置交錯寫入，無法在不知道密碼的情況下辨別任何欄位邊界。</p>
 
-    <p><b>檔案格式（Header）</b></p>
-    <pre>[ Magic / Version  :  4 bytes  ]  ← 內部識別，不對外暴露
-[ Salt             : 16 bytes  ]  ← 隨機鹽值，用於 PBKDF2
-[ IV               : 16 bytes  ]  ← 隨機初始向量
-[ Ciphertext       :  N bytes  ]  ← AES-256-CFB 加密內容
-[ HMAC-SHA256      : 32 bytes  ]  ← 完整性驗證碼（結尾）</pre>
+    <p style="margin-top:24px"><b>加密 JSON 標頭內容（範例）</b></p>
+    <pre>{
+  "filename":        "photo.jpg",
+  "original_size":   4096000,
+  "partial":         true,
+  "block_size":      1048576,
+  "mtime":           1745097600.0,
+  "atime":           1745097600.0,
+  "compress_middle": "block",
+  "compress_n":      65536,
+  "compress_algo":   "zlib"
+}</pre>
+
+    <p style="margin-top:24px"><b>加密模式</b></p>
+    <table>
+      <thead><tr><th>模式</th><th>說明</th><th>適用場景</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>全文加密</b></td>
+          <td>整個檔案以 AES-128-CTR 加密（單一 nonce）</td>
+          <td>小型檔案、需要最高機密性</td>
+        </tr>
+        <tr>
+          <td><b>部分加密</b><br><span class="badge badge-green">預設</span></td>
+          <td>首段 N bytes + 末段 N bytes 加密（各用獨立 nonce），中段保持原樣或壓縮。預設 block = <code>1 MB</code></td>
+          <td>大型影片、備份檔案、需要加快加密速度</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:24px"><b>中段壓縮模式（部分加密 + KVH 專屬）</b></p>
+    <table>
+      <thead><tr><th>模式</th><th>說明</th><th>N 參數</th></tr></thead>
+      <tbody>
+        <tr><td><code>full</code></td><td>中段整體以單一壓縮串流壓縮後輸出</td><td>無</td></tr>
+        <tr><td><code>partial</code></td><td>中段前 N bytes 與末 N bytes 保留原樣，中間部分壓縮</td><td>前後保留長度</td></tr>
+        <tr><td><code>block</code></td><td>中段切成 N bytes 為單位的區塊，奇數塊壓縮、偶數塊原樣（串流，不佔額外記憶體）</td><td>區塊大小</td></tr>
+      </tbody>
+    </table>
+    <p>壓縮演算法：<code>zlib</code>（快速）、<code>lzma</code>（LZMA_ALONE 格式，高壓縮比）、<code>lzma2</code>（XZ 格式）。<br>
+    已壓縮格式（<code>.mp4 .jpg .zip .docx</code> 等）自動跳過壓縮，避免膨脹。</p>
+
+    <p style="margin-top:24px"><b>加密選項完整參考</b></p>
+    <table>
+      <thead><tr><th>選項</th><th>預設值</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td>演算法格式</td><td>ESLock</td><td>選擇 <code>ESLock (.eslock)</code> 或 <code>KVH (.kvhlock)</code></td></tr>
+        <tr><td>密碼</td><td>（空白）</td><td>ESLock：空白 = 每檔案隨機金鑰。KVH：空白 = 使用內建預設密碼</td></tr>
+        <tr><td>輸入模式</td><td>資料夾</td><td>資料夾遞迴掃描 or 單一檔案</td></tr>
+        <tr><td>部分加密</td><td>開啟</td><td>僅加密首尾 N bytes，中段略過</td></tr>
+        <tr><td>Block Size</td><td>1,048,576 B（KVH） / 1,024 B（ESLock）</td><td>部分加密的首尾區塊大小</td></tr>
+        <tr><td>中段壓縮</td><td>關閉</td><td><b>KVH + 部分加密</b> 才可用。壓縮中段以減少檔案大小</td></tr>
+        <tr><td>壓縮模式</td><td>full</td><td><code>full</code> / <code>partial</code> / <code>block</code>（見上方說明）</td></tr>
+        <tr><td>N 值 + 單位</td><td>64 KB</td><td>partial / block 模式的 N 參數，單位 B / KB / MB</td></tr>
+        <tr><td>壓縮演算法</td><td>zlib</td><td><code>zlib</code> / <code>lzma</code> / <code>lzma2</code></td></tr>
+        <tr><td>跳過壓縮副檔名</td><td>開啟</td><td>已壓縮格式自動跳過（可自訂列表，可重置）</td></tr>
+        <tr><td>加密原始檔名</td><td>開啟</td><td>ESLock：原始檔名加密後存入 Footer。KVH：存入加密 JSON 標頭</td></tr>
+        <tr><td>保留原始日期</td><td>開啟</td><td>輸出檔案的 mtime/atime 設為原始檔案的時間戳記</td></tr>
+        <tr><td>輸出檔名格式</td><td>Timestamp</td><td><code>YYYYMMDDHHMMSSffffff.kvhlock</code> 或隨機 UUID</td></tr>
+        <tr><td>覆寫現有檔案</td><td>關閉</td><td>輸出路徑已存在時是否覆寫</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:24px"><b>解密 / 驗證選項</b></p>
+    <table>
+      <thead><tr><th>選項</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td>金鑰來源（ESLock）</td><td><b>Embedded</b>（直接從 Footer 讀取金鑰）/ <b>Password</b>（以密碼推導）/ <b>Hex</b>（直接輸入 16 bytes 十六進位金鑰）</td></tr>
+        <tr><td>忽略 CRC（ESLock）</td><td>略過 Footer CRC32 驗證，強制嘗試解密損壞檔案</td></tr>
+        <tr><td>Heuristic（ESLock）</td><td>Footer 損壞或截斷時，掃描末 128 KB 以啟發式搜尋有效 Footer 簽章</td></tr>
+        <tr><td>覆寫現有檔案</td><td>輸出路徑已存在時是否覆寫</td></tr>
+        <tr><td>Verify（驗證模式）</td><td>ESLock：解密至記憶體並驗證尺寸。KVH：串流計算 HMAC 並比對驗證碼，不寫出檔案</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <div class="en">
@@ -540,26 +1186,353 @@ Auth Tag (32 bytes) → appended to file</pre>
       </tbody>
     </table>
 
-    <p style="margin-top:24px"><b>KVH Key Hierarchy</b></p>
-    <pre>User Password
-   ↓ PBKDF2-HMAC-SHA256
-   ↓   salt = random 16 bytes
-   ↓   iterations = 600,000
-   ↓   dkLen = 32 bytes
-Master Key (32 bytes)
-   ↓ SHA256(Master Key + IV)
-File Key (32 bytes)
-   ↓ AES-256-CFB, IV = random 16 bytes
-Encrypted Ciphertext
-   ↓ HMAC-SHA256(File Key, Ciphertext)
-Auth Tag (32 bytes) → appended to file</pre>
+    <p style="margin-top:24px"><b>KVH Key Hierarchy</b> (see diagrams below)</p>
+    <p><b>Actual File Format (Obfuscated Header Layout)</b> (see diagrams below)</p>
+    <p class="muted-note">Salt and header bytes are interleaved at random cut points — field boundaries are indistinguishable without the password.</p>
 
-    <p><b>File Format (Header Layout)</b></p>
-    <pre>[ Magic / Version  :  4 bytes  ]  ← internal ID, not exposed externally
-[ Salt             : 16 bytes  ]  ← random salt for PBKDF2
-[ IV               : 16 bytes  ]  ← random initialisation vector
-[ Ciphertext       :  N bytes  ]  ← AES-256-CFB encrypted content
-[ HMAC-SHA256      : 32 bytes  ]  ← integrity authentication tag (end)</pre>
+    <p style="margin-top:24px"><b>Encrypted JSON Header (example)</b></p>
+    <pre>{
+  "filename":        "photo.jpg",
+  "original_size":   4096000,
+  "partial":         true,
+  "block_size":      1048576,
+  "mtime":           1745097600.0,
+  "atime":           1745097600.0,
+  "compress_middle": "block",
+  "compress_n":      65536,
+  "compress_algo":   "zlib"
+}</pre>
+
+    <p style="margin-top:24px"><b>Encryption Modes</b></p>
+    <table>
+      <thead><tr><th>Mode</th><th>Description</th><th>Use Case</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Full Encryption</b></td>
+          <td>Entire file encrypted with AES-128-CTR (single nonce)</td>
+          <td>Small files, maximum confidentiality required</td>
+        </tr>
+        <tr>
+          <td><b>Partial Encryption</b><br><span class="badge badge-green">Default</span></td>
+          <td>First N bytes + last N bytes encrypted (independent nonces each); middle left as-is or compressed. Default block = <code>1 MB</code></td>
+          <td>Large videos, backups, speed-critical use cases</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:24px"><b>Middle Compression Modes (Partial + KVH only)</b></p>
+    <table>
+      <thead><tr><th>Mode</th><th>Description</th><th>N Parameter</th></tr></thead>
+      <tbody>
+        <tr><td><code>full</code></td><td>Entire middle section compressed as a single stream</td><td>N/A</td></tr>
+        <tr><td><code>partial</code></td><td>First N bytes and last N bytes of middle kept raw; only the inner portion is compressed</td><td>Edge preserve length</td></tr>
+        <tr><td><code>block</code></td><td>Middle split into N-byte chunks; even-indexed chunks compressed, odd-indexed raw (streaming — no full-middle RAM buffering)</td><td>Chunk size</td></tr>
+      </tbody>
+    </table>
+    <p>Compression algorithms: <code>zlib</code> (fast), <code>lzma</code> (LZMA_ALONE, high ratio), <code>lzma2</code> (XZ format).<br>
+    Pre-compressed formats (<code>.mp4 .jpg .zip .docx</code> etc.) are automatically skipped to prevent bloat.</p>
+
+    <p style="margin-top:24px"><b>Encryption Options Reference</b></p>
+    <table>
+      <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Algorithm format</td><td>ESLock</td><td>Choose <code>ESLock (.eslock)</code> or <code>KVH (.kvhlock)</code></td></tr>
+        <tr><td>Password</td><td>(empty)</td><td>ESLock: empty = random key per file. KVH: empty = built-in default password</td></tr>
+        <tr><td>Input mode</td><td>Folder</td><td>Recursive folder scan or single file</td></tr>
+        <tr><td>Partial encryption</td><td>On</td><td>Encrypt only first and last N bytes; skip the middle</td></tr>
+        <tr><td>Block size</td><td>1,048,576 B (KVH) / 1,024 B (ESLock)</td><td>Head/tail block size for partial encryption</td></tr>
+        <tr><td>Compress middle</td><td>Off</td><td><b>KVH + Partial</b> only. Compress the middle section to reduce file size</td></tr>
+        <tr><td>Compress mode</td><td>full</td><td><code>full</code> / <code>partial</code> / <code>block</code> (see table above)</td></tr>
+        <tr><td>N value + unit</td><td>64 KB</td><td>N parameter for partial / block modes; unit: B / KB / MB</td></tr>
+        <tr><td>Compress algorithm</td><td>zlib</td><td><code>zlib</code> / <code>lzma</code> / <code>lzma2</code></td></tr>
+        <tr><td>Skip compress exts</td><td>On</td><td>Skip compression for already-compressed formats (editable list, resettable)</td></tr>
+        <tr><td>Filename encryption</td><td>On</td><td>ESLock: original name encrypted into footer. KVH: stored in encrypted JSON header</td></tr>
+        <tr><td>Preserve file date</td><td>On</td><td>Output file mtime/atime is set to the source file's original timestamp</td></tr>
+        <tr><td>Output filename</td><td>Timestamp</td><td><code>YYYYMMDDHHMMSSffffff.kvhlock</code> or random UUID</td></tr>
+        <tr><td>Overwrite existing</td><td>Off</td><td>Whether to overwrite if the output path already exists</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:24px"><b>Decrypt / Verify Options</b></p>
+    <table>
+      <thead><tr><th>Option</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Key source (ESLock)</td><td><b>Embedded</b> (read key directly from footer) / <b>Password</b> (derive key from password) / <b>Hex</b> (enter 16-byte key as hex directly)</td></tr>
+        <tr><td>Ignore CRC (ESLock)</td><td>Skip footer CRC32 validation — forces decryption attempt on corrupted files</td></tr>
+        <tr><td>Heuristic (ESLock)</td><td>When footer is corrupted or truncated, scan the last 128 KB for valid footer signatures</td></tr>
+        <tr><td>Overwrite existing</td><td>Whether to overwrite if the output path already exists</td></tr>
+        <tr><td>Verify mode</td><td>ESLock: decrypt to memory and validate output size. KVH: stream-compute HMAC and compare tag — no file written</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── KVH Visual Diagrams (bilingual via tspan, outside zh/en) ── -->
+
+  <!-- SVG A: Key Hierarchy -->
+  <div style="margin-top:28px">
+    <p style="margin-bottom:8px;font-weight:bold"><span class="zhi">金鑰層級架構圖</span><span class="eni">Key Hierarchy Diagram</span></p>
+    <svg id="svgKvhKH" viewBox="0 0 900 545" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:system-ui">
+      <defs>
+        <marker id="kh1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/></marker>
+        <marker id="kh2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#a78bfa"/></marker>
+        <marker id="kh3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#fbbf24"/></marker>
+        <marker id="kh4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#34d399"/></marker>
+      </defs>
+      <!-- 1. Password -->
+      <rect x="300" y="10" width="300" height="50" rx="8" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="450" y="33" font-size="14" fill="#e5e7eb" text-anchor="middle"><tspan class="zhi">使用者密碼</tspan><tspan class="eni">User Password</tspan></text>
+      <text x="450" y="51" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">（短於 32 字元時以 HMAC-SHA256 迭代補長）</tspan><tspan class="eni">(HMAC-SHA256 padded to 32 chars if shorter)</tspan></text>
+      <!-- Arrow pw→pbkdf2 -->
+      <line x1="450" y1="60" x2="450" y2="97" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#kh1)"/>
+      <!-- 2. PBKDF2 -->
+      <rect x="240" y="100" width="420" height="58" rx="8" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="450" y="122" font-size="13" fill="#e5e7eb" text-anchor="middle">PBKDF2-HMAC-SHA256</text>
+      <text x="450" y="143" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">600,000 次迭代 · master_salt（隨機 16 B） · dkLen = 16 B</tspan><tspan class="eni">600,000 iterations · master_salt (random 16 B) · dkLen = 16 B</tspan></text>
+      <!-- Arrow pbkdf2→master key -->
+      <line x1="450" y1="158" x2="450" y2="202" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#kh1)"/>
+      <!-- 3. Master Key -->
+      <rect x="310" y="205" width="280" height="50" rx="8" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="450" y="227" font-size="14" fill="#60a5fa" text-anchor="middle">Master Key</text>
+      <text x="450" y="245" font-size="11" fill="#94a3b8" text-anchor="middle">16 bytes / AES-128</text>
+      <!-- Branch: Master Key → AES-128-CBC Header -->
+      <line x1="590" y1="230" x2="647" y2="230" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#kh2)"/>
+      <rect x="650" y="205" width="220" height="50" rx="8" fill="#020617" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="760" y="225" font-size="12" fill="#a78bfa" text-anchor="middle">AES-128-CBC</text>
+      <text x="760" y="243" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">標頭加密（保護 JSON Metadata）</tspan><tspan class="eni">Header encrypt (JSON metadata)</tspan></text>
+      <!-- Arrow master key→file key -->
+      <line x1="450" y1="255" x2="450" y2="307" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#kh1)"/>
+      <text x="450" y="285" font-size="10" fill="#94a3b8" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">SHA256(Master Key + file_iv)[:16]</text>
+      <!-- 4. File Key -->
+      <rect x="310" y="310" width="280" height="50" rx="8" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="450" y="332" font-size="14" fill="#60a5fa" text-anchor="middle">File Key</text>
+      <text x="450" y="350" font-size="11" fill="#94a3b8" text-anchor="middle">16 bytes / AES-128</text>
+      <!-- Branch: File Key → AES-128-CTR Body -->
+      <line x1="590" y1="335" x2="647" y2="335" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#kh3)"/>
+      <rect x="650" y="310" width="220" height="50" rx="8" fill="#020617" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="760" y="330" font-size="12" fill="#fbbf24" text-anchor="middle">AES-128-CTR</text>
+      <text x="760" y="348" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">加密本體（全文 / 部分模式）</tspan><tspan class="eni">Body encrypt (full / partial mode)</tspan></text>
+      <!-- Arrow file key→hmac key -->
+      <line x1="450" y1="360" x2="450" y2="402" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#kh1)"/>
+      <text x="450" y="384" font-size="10" fill="#94a3b8" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">SHA256(File Key + 0x01)</text>
+      <!-- 5. HMAC Key -->
+      <rect x="310" y="405" width="280" height="50" rx="8" fill="#020617" stroke="#34d399" stroke-width="1.5"/>
+      <text x="450" y="427" font-size="14" fill="#34d399" text-anchor="middle">HMAC Key</text>
+      <text x="450" y="445" font-size="11" fill="#94a3b8" text-anchor="middle">32 bytes</text>
+      <!-- Arrow hmac key→auth tag -->
+      <line x1="450" y1="455" x2="450" y2="484" stroke="#34d399" stroke-width="1.5" marker-end="url(#kh4)"/>
+      <text x="450" y="473" font-size="10" fill="#94a3b8" text-anchor="middle">HMAC-SHA256(Body Ciphertext)</text>
+      <!-- 6. Auth Tag -->
+      <rect x="310" y="487" width="280" height="50" rx="8" fill="#020617" stroke="#34d399" stroke-width="1.5"/>
+      <text x="450" y="509" font-size="13" fill="#34d399" text-anchor="middle"><tspan class="zhi">Auth Tag（32 B）</tspan><tspan class="eni">Auth Tag (32 B)</tspan></text>
+      <text x="450" y="527" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">附加於檔案結尾</tspan><tspan class="eni">appended to end of file</tspan></text>
+    </svg>
+    <button class="btn" style="margin-top:10px" onclick="exportSVG('svgKvhKH','kvh_key_hierarchy.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+  </div>
+
+  <!-- SVG B: File Format -->
+  <div style="margin-top:28px">
+    <p style="margin-bottom:8px;font-weight:bold"><span class="zhi">KVH 檔案格式（標頭混淆佈局）</span><span class="eni">KVH File Format (Obfuscated Header Layout)</span></p>
+    <svg id="svgKvhFF" viewBox="0 0 900 200" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:system-ui">
+      <!-- Row 1: macro view -->
+      <rect x="0"   y="10" width="600" height="62" rx="0" fill="#1a0f30" stroke="#a78bfa" stroke-width="1.5"/>
+      <rect x="607" y="10" width="213" height="62" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <rect x="827" y="10" width="73"  height="62" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.5"/>
+      <text x="300" y="34" font-size="13" fill="#a78bfa" text-anchor="middle"><tspan class="zhi">混淆標頭（Obfuscated Header）</tspan><tspan class="eni">Obfuscated Header</tspan></text>
+      <text x="300" y="53" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">magic · salt · hdr 交錯 · IVs — 無密碼無法辨別欄位</tspan><tspan class="eni">magic · salt · hdr interleaved · IVs — indistinguishable w/o password</tspan></text>
+      <text x="713" y="36" font-size="12" fill="#60a5fa" text-anchor="middle"><tspan class="zhi">加密本體</tspan><tspan class="eni">Body</tspan></text>
+      <text x="713" y="52" font-size="11" fill="#94a3b8" text-anchor="middle">AES-128-CTR</text>
+      <text x="863" y="33" font-size="11" fill="#34d399" text-anchor="middle">HMAC</text>
+      <text x="863" y="48" font-size="11" fill="#34d399" text-anchor="middle">SHA256</text>
+      <text x="863" y="63" font-size="10" fill="#94a3b8" text-anchor="middle">32 B</text>
+      <!-- Zoom connectors (header x=0~600 fans to full row x=0~900) -->
+      <line x1="0"   y1="72" x2="0"   y2="97" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>
+      <line x1="600" y1="72" x2="900" y2="97" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>
+      <text x="300" y="91" font-size="10" fill="#a78bfa" text-anchor="middle"><tspan class="zhi">▼ 標頭欄位展開（依比例顯示）</tspan><tspan class="eni">▼ Header fields breakdown</tspan></text>
+      <!-- Row 2: header sub-fields (10 boxes, total 900px) -->
+      <!-- widths: 72 44 94 44 168 94 100 100 44 140 = 900 -->
+      <rect x="0"   y="100" width="72"  height="90" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.3"/>
+      <rect x="72"  y="100" width="44"  height="90" rx="0" fill="#0a2430" stroke="#06b6d4" stroke-width="1.3"/>
+      <rect x="116" y="100" width="94"  height="90" rx="0" fill="#0a2430" stroke="#06b6d4" stroke-width="1.3"/>
+      <rect x="210" y="100" width="44"  height="90" rx="0" fill="#1a0a2a" stroke="#a78bfa" stroke-width="1.3"/>
+      <rect x="254" y="100" width="168" height="90" rx="0" fill="#1a0a2a" stroke="#a78bfa" stroke-width="1.3"/>
+      <rect x="422" y="100" width="94"  height="90" rx="0" fill="#0a2430" stroke="#06b6d4" stroke-width="1.3"/>
+      <rect x="516" y="100" width="100" height="90" rx="0" fill="#1a1500" stroke="#fbbf24" stroke-width="1.3"/>
+      <rect x="616" y="100" width="100" height="90" rx="0" fill="#1a1500" stroke="#fbbf24" stroke-width="1.3"/>
+      <rect x="716" y="100" width="44"  height="90" rx="0" fill="#1a0a2a" stroke="#a78bfa" stroke-width="1.3"/>
+      <rect x="760" y="100" width="140" height="90" rx="0" fill="#1a0a2a" stroke="#a78bfa" stroke-width="1.3"/>
+      <!-- Field labels -->
+      <g font-size="10" text-anchor="middle">
+        <text x="36"  y="120" fill="#60a5fa">enc_</text>  <text x="36"  y="133" fill="#60a5fa">magic</text>  <text x="36"  y="148" fill="#94a3b8">4 B</text>  <text x="36"  y="163" fill="#94a3b8">XOR</text>  <text x="36"  y="176" fill="#94a3b8">pw[0:4]</text>
+        <text x="94"  y="120" fill="#06b6d4">salt</text>   <text x="94"  y="133" fill="#06b6d4">off</text>    <text x="94"  y="148" fill="#94a3b8">1 B</text>
+        <text x="163" y="120" fill="#06b6d4">salt_prefix</text>  <text x="163" y="135" fill="#94a3b8"><tspan class="zhi">前段鹽值</tspan><tspan class="eni">salt front</tspan></text>  <text x="163" y="150" fill="#94a3b8">0~15 B</text>
+        <text x="232" y="120" fill="#a78bfa">hdr</text>    <text x="232" y="133" fill="#a78bfa">off</text>    <text x="232" y="148" fill="#94a3b8">1 B</text>
+        <text x="338" y="120" fill="#a78bfa">hdr_prefix</text>  <text x="338" y="135" fill="#94a3b8"><tspan class="zhi">標頭前段</tspan><tspan class="eni">hdr front</tspan></text>  <text x="338" y="150" fill="#94a3b8">var B</text>
+        <text x="469" y="120" fill="#06b6d4">salt_suffix</text>  <text x="469" y="135" fill="#94a3b8"><tspan class="zhi">後段鹽值</tspan><tspan class="eni">salt back</tspan></text>  <text x="469" y="150" fill="#94a3b8">var B</text>
+        <text x="566" y="120" fill="#fbbf24">file_iv</text>  <text x="566" y="135" fill="#94a3b8"><tspan class="zhi">檔案 IV</tspan><tspan class="eni">file IV</tspan></text>  <text x="566" y="150" fill="#94a3b8">16 B</text>
+        <text x="666" y="120" fill="#fbbf24">header_iv</text>  <text x="666" y="135" fill="#94a3b8"><tspan class="zhi">標頭 IV</tspan><tspan class="eni">header IV</tspan></text>  <text x="666" y="150" fill="#94a3b8">16 B</text>
+        <text x="738" y="120" fill="#a78bfa">hlen</text>    <text x="738" y="135" fill="#94a3b8">4 B</text>
+        <text x="830" y="120" fill="#a78bfa">hdr_suffix</text>  <text x="830" y="135" fill="#94a3b8"><tspan class="zhi">標頭後段</tspan><tspan class="eni">hdr tail</tspan></text>  <text x="830" y="150" fill="#94a3b8">var B</text>
+      </g>
+    </svg>
+    <button class="btn" style="margin-top:10px" onclick="exportSVG('svgKvhFF','kvh_file_format.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+  </div>
+
+  <!-- SVG C: Encryption Modes (Full vs Partial) -->
+  <div style="margin-top:28px">
+    <p style="margin-bottom:8px;font-weight:bold"><span class="zhi">加密模式對比（全文 vs 部分）</span><span class="eni">Encryption Modes: Full vs Partial</span></p>
+    <svg id="svgKvhEM" viewBox="0 0 900 230" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:system-ui">
+      <defs>
+        <marker id="em1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/></marker>
+      </defs>
+      <!-- Vertical divider -->
+      <line x1="450" y1="0" x2="450" y2="230" stroke="#2e3350" stroke-width="1.5" stroke-dasharray="6,4"/>
+      <!-- ── LEFT: Full Encryption ── -->
+      <text x="215" y="18" font-size="13" fill="#e5e7eb" text-anchor="middle" font-weight="bold"><tspan class="zhi">全文加密</tspan><tspan class="eni">Full Encryption</tspan></text>
+      <!-- Input box -->
+      <rect x="30" y="26" width="370" height="44" rx="6" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="215" y="46" font-size="13" fill="#e5e7eb" text-anchor="middle"><tspan class="zhi">原始檔案（所有位元組）</tspan><tspan class="eni">Original File (all bytes)</tspan></text>
+      <text x="215" y="62" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">任意大小</tspan><tspan class="eni">any size</tspan></text>
+      <!-- Arrow -->
+      <line x1="215" y1="70" x2="215" y2="88" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#em1)"/>
+      <!-- Cipher labels -->
+      <text x="215" y="102" font-size="11" fill="#94a3b8" text-anchor="middle">AES-128-CTR</text>
+      <text x="215" y="117" font-size="10" fill="#94a3b8" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">nonce = file_iv[:8]</text>
+      <!-- Arrow -->
+      <line x1="215" y1="121" x2="215" y2="139" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#em1)"/>
+      <!-- Output strip -->
+      <rect x="30"  y="141" width="295" height="44" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <rect x="327" y="141" width="73"  height="44" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.5"/>
+      <text x="177" y="158" font-size="11" fill="#e5e7eb" text-anchor="middle"><tspan class="zhi">加密本體</tspan><tspan class="eni">Encrypted Body</tspan></text>
+      <text x="177" y="174" font-size="10" fill="#94a3b8" text-anchor="middle">AES-128-CTR</text>
+      <text x="363" y="158" font-size="10" fill="#34d399" text-anchor="middle">HMAC</text>
+      <text x="363" y="172" font-size="10" fill="#34d399" text-anchor="middle">32 B</text>
+      <!-- Output label -->
+      <text x="215" y="205" font-size="11" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">輸出：</tspan><tspan class="eni">Output: </tspan><tspan font-family="'Cascadia Code',Consolas,monospace" fill="#60a5fa">file.kvhlock</tspan></text>
+      <!-- ── RIGHT: Partial Encryption ── -->
+      <text x="675" y="18" font-size="13" fill="#e5e7eb" text-anchor="middle" font-weight="bold"><tspan class="zhi">部分加密</tspan><tspan class="eni">Partial Encryption</tspan> <tspan fill="#34d399" font-size="11">(default)</tspan></text>
+      <!-- Top row: 3 blocks -->
+      <rect x="460" y="26" width="110" height="44" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <rect x="570" y="26" width="210" height="44" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.5"/>
+      <rect x="780" y="26" width="110" height="44" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="515" y="44" font-size="12" fill="#e5e7eb" text-anchor="middle"><tspan class="zhi">前段</tspan><tspan class="eni">Head</tspan></text>
+      <text x="515" y="60" font-size="10" fill="#94a3b8" text-anchor="middle">1 MB</text>
+      <text x="675" y="44" font-size="12" fill="#64748b" text-anchor="middle"><tspan class="zhi">中段（明文）</tspan><tspan class="eni">Middle (plain)</tspan></text>
+      <text x="835" y="44" font-size="12" fill="#e5e7eb" text-anchor="middle"><tspan class="zhi">後段</tspan><tspan class="eni">Tail</tspan></text>
+      <text x="835" y="60" font-size="10" fill="#94a3b8" text-anchor="middle">1 MB</text>
+      <!-- Arrows -->
+      <line x1="515" y1="70" x2="515" y2="88" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#em1)"/>
+      <line x1="835" y1="70" x2="835" y2="88" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#em1)"/>
+      <!-- Cipher labels (different nonces!) -->
+      <text x="515" y="101" font-size="10" fill="#94a3b8" text-anchor="middle">AES-128-CTR</text>
+      <text x="515" y="115" font-size="9"  fill="#94a3b8" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">nonce=file_iv[:8]</text>
+      <text x="835" y="101" font-size="10" fill="#94a3b8" text-anchor="middle">AES-128-CTR</text>
+      <text x="835" y="115" font-size="9"  fill="#94a3b8" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">nonce=file_iv[8:]</text>
+      <!-- Arrows -->
+      <line x1="515" y1="119" x2="515" y2="137" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#em1)"/>
+      <line x1="835" y1="119" x2="835" y2="137" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#em1)"/>
+      <!-- Output strip -->
+      <rect x="460" y="139" width="110" height="44" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <rect x="570" y="139" width="210" height="44" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.5"/>
+      <rect x="780" y="139" width="110" height="44" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="515" y="157" font-size="11" fill="#e5e7eb" text-anchor="middle"><tspan class="zhi">加密前段</tspan><tspan class="eni">Enc Head</tspan></text>
+      <text x="675" y="155" font-size="11" fill="#64748b" text-anchor="middle"><tspan class="zhi">明文透傳</tspan><tspan class="eni">Pass-through</tspan></text>
+      <text x="675" y="170" font-size="10" fill="#475569" text-anchor="middle"><tspan class="zhi">（或壓縮）</tspan><tspan class="eni">(or compressed)</tspan></text>
+      <text x="835" y="157" font-size="11" fill="#e5e7eb" text-anchor="middle"><tspan class="zhi">加密後段</tspan><tspan class="eni">Enc Tail</tspan></text>
+      <!-- HMAC row -->
+      <rect x="460" y="185" width="430" height="35" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.5"/>
+      <text x="675" y="207" font-size="12" fill="#34d399" text-anchor="middle">HMAC-SHA256 (32 B)</text>
+    </svg>
+    <button class="btn" style="margin-top:10px" onclick="exportSVG('svgKvhEM','kvh_enc_modes.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+  </div>
+
+  <!-- SVG D: Middle Compression Modes -->
+  <div style="margin-top:28px">
+    <p style="margin-bottom:8px;font-weight:bold"><span class="zhi">中段壓縮模式（KVH 部分加密專屬）</span><span class="eni">Middle Compression Modes (KVH Partial Encryption Only)</span></p>
+    <svg id="svgKvhCM" viewBox="0 0 900 300" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:system-ui">
+      <!-- Legend labels on left (x=0-140), strip on right (x=145-900=755px) -->
+      <!-- Strip layout: Head(70) gap(3) Middle(540) gap(3) Tail(70) gap(3) HMAC(66) = 755px + 145 start = 900 -->
+      <!-- ── Row 1: compress_middle="full" (y=5-93) ── -->
+      <rect x="0"   y="5"  width="140" height="88" rx="6" fill="#0f1117" stroke="#2e3350" stroke-width="1"/>
+      <text x="70"  y="42" font-size="12" fill="#a78bfa" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">full</text>
+      <text x="70"  y="60" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">整段壓縮</tspan><tspan class="eni">whole stream</tspan></text>
+      <!-- Head (encrypted) -->
+      <rect x="145" y="14" width="70" height="70" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="180" y="47" font-size="10" fill="#60a5fa" text-anchor="middle"><tspan class="zhi">加密</tspan><tspan class="eni">Enc</tspan></text>
+      <text x="180" y="61" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">前段</tspan><tspan class="eni">Head</tspan></text>
+      <!-- Middle: full compress -->
+      <rect x="218" y="14" width="540" height="70" rx="0" fill="#0a2a0a" stroke="#34d399" stroke-width="1.5"/>
+      <text x="488" y="47" font-size="12" fill="#34d399" text-anchor="middle"><tspan class="zhi">壓縮串流（單一連續輸出）</tspan><tspan class="eni">Compressed Stream (single continuous output)</tspan></text>
+      <text x="488" y="63" font-size="10" fill="#94a3b8" text-anchor="middle">zlib / lzma / lzma2</text>
+      <!-- Tail (encrypted) -->
+      <rect x="761" y="14" width="70" height="70" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="796" y="47" font-size="10" fill="#60a5fa" text-anchor="middle"><tspan class="zhi">加密</tspan><tspan class="eni">Enc</tspan></text>
+      <text x="796" y="61" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">後段</tspan><tspan class="eni">Tail</tspan></text>
+      <!-- HMAC -->
+      <rect x="834" y="14" width="66" height="70" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.3"/>
+      <text x="867" y="47" font-size="10" fill="#34d399" text-anchor="middle">HMAC</text>
+      <text x="867" y="61" font-size="10" fill="#34d399" text-anchor="middle">32 B</text>
+
+      <!-- ── Row 2: compress_middle="partial" (y=103-191) ── -->
+      <rect x="0"   y="103" width="140" height="88" rx="6" fill="#0f1117" stroke="#2e3350" stroke-width="1"/>
+      <text x="70"  y="140" font-size="12" fill="#a78bfa" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">partial</text>
+      <text x="70"  y="158" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">邊緣保留</tspan><tspan class="eni">edge raw</tspan></text>
+      <!-- Head -->
+      <rect x="145" y="112" width="70" height="70" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="180" y="145" font-size="10" fill="#60a5fa" text-anchor="middle"><tspan class="zhi">加密前段</tspan><tspan class="eni">Enc Head</tspan></text>
+      <!-- Middle: partial — prefix raw | inner compressed | suffix raw -->
+      <rect x="218" y="112" width="120" height="70" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.3"/>
+      <text x="278" y="141" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">前綴原始</tspan><tspan class="eni">prefix raw</tspan></text>
+      <text x="278" y="156" font-size="9"  fill="#64748b" text-anchor="middle">N B</text>
+      <rect x="341" y="112" width="296" height="70" rx="0" fill="#0a2a0a" stroke="#34d399" stroke-width="1.3"/>
+      <text x="489" y="141" font-size="11" fill="#34d399" text-anchor="middle"><tspan class="zhi">內核壓縮</tspan><tspan class="eni">inner compressed</tspan></text>
+      <rect x="640" y="112" width="118" height="70" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.3"/>
+      <text x="699" y="141" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">後綴原始</tspan><tspan class="eni">suffix raw</tspan></text>
+      <text x="699" y="156" font-size="9"  fill="#64748b" text-anchor="middle">N B</text>
+      <!-- Tail -->
+      <rect x="761" y="112" width="70" height="70" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="796" y="145" font-size="10" fill="#60a5fa" text-anchor="middle"><tspan class="zhi">加密後段</tspan><tspan class="eni">Enc Tail</tspan></text>
+      <!-- HMAC -->
+      <rect x="834" y="112" width="66" height="70" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.3"/>
+      <text x="867" y="145" font-size="10" fill="#34d399" text-anchor="middle">HMAC</text>
+      <text x="867" y="159" font-size="10" fill="#34d399" text-anchor="middle">32 B</text>
+
+      <!-- ── Row 3: compress_middle="block" (y=201-289) ── -->
+      <rect x="0"   y="201" width="140" height="88" rx="6" fill="#0f1117" stroke="#2e3350" stroke-width="1"/>
+      <text x="70"  y="238" font-size="12" fill="#a78bfa" text-anchor="middle" font-family="'Cascadia Code',Consolas,monospace">block</text>
+      <text x="70"  y="256" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">交錯壓縮</tspan><tspan class="eni">alternating</tspan></text>
+      <!-- Head -->
+      <rect x="145" y="210" width="70" height="70" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="180" y="243" font-size="10" fill="#60a5fa" text-anchor="middle"><tspan class="zhi">加密前段</tspan><tspan class="eni">Enc Head</tspan></text>
+      <!-- Middle: block — alternating C/R blocks (6×90px) -->
+      <rect x="218" y="210" width="90" height="70" rx="0" fill="#0a2a0a" stroke="#34d399" stroke-width="1.3"/>
+      <text x="263" y="242" font-size="11" fill="#34d399" text-anchor="middle">C₀</text>
+      <text x="263" y="257" font-size="9" fill="#94a3b8" text-anchor="middle">N B</text>
+      <rect x="308" y="210" width="90" height="70" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.3"/>
+      <text x="353" y="242" font-size="11" fill="#64748b" text-anchor="middle">R₁</text>
+      <text x="353" y="257" font-size="9" fill="#94a3b8" text-anchor="middle">N B</text>
+      <rect x="398" y="210" width="90" height="70" rx="0" fill="#0a2a0a" stroke="#34d399" stroke-width="1.3"/>
+      <text x="443" y="242" font-size="11" fill="#34d399" text-anchor="middle">C₂</text>
+      <text x="443" y="257" font-size="9" fill="#94a3b8" text-anchor="middle">N B</text>
+      <rect x="488" y="210" width="90" height="70" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.3"/>
+      <text x="533" y="242" font-size="11" fill="#64748b" text-anchor="middle">R₃</text>
+      <text x="533" y="257" font-size="9" fill="#94a3b8" text-anchor="middle">N B</text>
+      <rect x="578" y="210" width="90" height="70" rx="0" fill="#0a2a0a" stroke="#34d399" stroke-width="1.3"/>
+      <text x="623" y="242" font-size="11" fill="#34d399" text-anchor="middle">C₄</text>
+      <text x="623" y="257" font-size="9" fill="#94a3b8" text-anchor="middle">N B</text>
+      <rect x="668" y="210" width="90" height="70" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.3"/>
+      <text x="713" y="242" font-size="11" fill="#64748b" text-anchor="middle">R₅…</text>
+      <text x="713" y="257" font-size="9" fill="#94a3b8" text-anchor="middle">N B</text>
+      <!-- Tail -->
+      <rect x="761" y="210" width="70" height="70" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+      <text x="796" y="243" font-size="10" fill="#60a5fa" text-anchor="middle"><tspan class="zhi">加密後段</tspan><tspan class="eni">Enc Tail</tspan></text>
+      <!-- HMAC -->
+      <rect x="834" y="210" width="66" height="70" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.3"/>
+      <text x="867" y="243" font-size="10" fill="#34d399" text-anchor="middle">HMAC</text>
+      <text x="867" y="257" font-size="10" fill="#34d399" text-anchor="middle">32 B</text>
+      <!-- Legend note: C=compressed, R=raw -->
+      <text x="450" y="293" font-size="10" fill="#94a3b8" text-anchor="middle"><tspan class="zhi">C = 壓縮塊（偶數索引）· R = 原始塊（奇數索引）· 串流處理，不需完整載入記憶體</tspan><tspan class="eni">C = compressed (even index) · R = raw (odd index) · streaming — no full-middle RAM buffer</tspan></text>
+    </svg>
+    <button class="btn" style="margin-top:10px" onclick="exportSVG('svgKvhCM','kvh_compress_modes.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
   </div>
 </div>
 </section>
