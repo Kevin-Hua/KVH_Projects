@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESLock &amp; KVH Locker — Security Whitepaper</title>
+
+<link rel="stylesheet" href="index.css">
+</head>
+
+<body style="background:#060c18;color:#e5e7eb">
+
+<div class="lang-switch">
+  <button id="btn-zh" class="active" onclick="setLang('zh')">中文</button>
+  <button id="btn-en" onclick="setLang('en')">English</button>
+</div>
+
+<div class="wrapper">
+
+<nav>
+  <h3>📑 <span class="zhi">目錄</span><span class="eni">Contents</span></h3>
+  <a href="#overview">     <span class="zhi">概覽</span>              <span class="eni">Overview</span></a>
+  <a href="#architecture"> <span class="zhi">系統架構</span>          <span class="eni">System Architecture</span></a>
+  <a href="#crypto">       <span class="zhi">加密模型</span>          <span class="eni">Encryption Model</span></a>
+  <a href="#eslock-compat"> <span class="zhi">ESLock 相容性</span>    <span class="eni">ESLock Compatibility</span></a>
+  <a href="#eslock-partial"><span class="zhi">部分加密</span>          <span class="eni">Partial Encryption</span></a>
+  <a href="#kvh-design">   <span class="zhi">KVH 設計目標</span>     <span class="eni">KVH Design Goals</span></a>
+  <a href="#eslock-flow">  <span class="zhi">ESLock 加密流程</span>  <span class="eni">ESLock Flow</span></a>
+  <a href="#kvh-flow">     <span class="zhi">KVH 加密流程</span>    <span class="eni">KVH Crypto Flow</span></a>
+  <a href="#lifecycle">    <span class="zhi">資料生命週期</span>     <span class="eni">Data Lifecycle</span></a>
+  <a href="#attack">       <span class="zhi">攻擊面</span>            <span class="eni">Attack Surface</span></a>
+  <a href="#stride">       <span class="zhi">STRIDE 威脅模型</span>  <span class="eni">STRIDE Threat Model</span></a>
+  <a href="#linddun">      <span class="zhi">LINDDUN 隱私模型</span><span class="eni">LINDDUN Privacy Model</span></a>
+  <a href="#compare">      <span class="zhi">方案比較</span>          <span class="eni">Comparison</span></a>
+  <a href="#assumptions">  <span class="zhi">安全假設</span>          <span class="eni">Security Assumptions</span></a>
+  <a href="#risk">         <span class="zhi">風險評估</span>          <span class="eni">Risk Assessment</span></a>
+  <a href="#legal">        <span class="zhi">法務聲明</span>          <span class="eni">Legal &amp; Compliance</span></a>
+  <a href="#limits">       <span class="zhi">限制與風險</span>        <span class="eni">Limitations &amp; Risks</span></a>
+  <a href="#conclusion">   <span class="zhi">結語</span>              <span class="eni">Conclusion</span></a>
+</nav>
+
+<main>
+
+<!-- ===== Overview ===== -->
+<section id="overview">
+<div class="icon-title">📦 <span class="zhi">概覽</span><span class="eni">Overview</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh"><p>本文件為 ESLock Encryptor / Decryptor 與 KVH Locker 的完整安全白皮書，描述其系統架構、加密模型、威脅面分析與已知限制。</p></div>
+  <div class="en"><p>This document is a comprehensive security whitepaper for ESLock Encryptor / Decryptor and KVH Locker, covering system architecture, encryption models, threat analysis, and known limitations.</p></div>
+</div>
+</section>
+
+<!-- ===== Architecture ===== -->
+<section id="architecture">
+<div class="icon-title">⚙️ <span class="zhi">系統架構</span><span class="eni">System Architecture</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh"><ul>
+    <li>使用者端工具（CLI / GUI）</li>
+    <li>密碼學核心（AES / PBKDF2 / HMAC）</li>
+    <li>檔案格式層（ESLock Footer / KVH Header）</li>
+    <li>本機儲存與備份媒體</li>
+  </ul></div>
+  <div class="en"><ul>
+    <li>User-side tooling (CLI / GUI)</li>
+    <li>Cryptographic core (AES / PBKDF2 / HMAC)</li>
+    <li>File format layer (ESLock footer / KVH header)</li>
+    <li>Local storage and backup media</li>
+  </ul></div>
+</div>
+</section>
+
+<!-- ===== Crypto ===== -->
+<section id="crypto">
+<div class="icon-title">🔐 <span class="zhi">加密模型</span><span class="eni">Encryption Model</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh">
+    <p><b>ESLock</b></p>
+    <ul>
+      <li>AES-128-CFB（相容行動裝置）</li>
+      <li>Key = MD5(password)</li>
+      <li>支援 Partial / Full Encryption</li>
+    </ul>
+    <p><b>KVH Locker</b></p>
+    <ul>
+      <li>PBKDF2-HMAC-SHA256（600k iterations）</li>
+      <li>Master Key 派生成 File Key</li>
+      <li>AES 加密 + HMAC 完整性驗證</li>
+    </ul>
+  </div>
+  <div class="en">
+    <p><b>ESLock</b></p>
+    <ul>
+      <li>AES-128-CFB (mobile compatible)</li>
+      <li>Key derived from MD5(password)</li>
+      <li>Supports partial and full encryption</li>
+    </ul>
+    <p><b>KVH Locker</b></p>
+    <ul>
+      <li>PBKDF2-HMAC-SHA256 (600k iterations)</li>
+      <li>Master key to file key derivation</li>
+      <li>AES encryption with HMAC integrity check</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+<!-- ===== ESLock Compatibility ===== -->
+<section id="eslock-compat">
+<div class="icon-title">📦 <span class="zhi">ESLock 相容性說明</span><span class="eni">ES File Explorer Compatibility</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh">
+    <p><b>加密演算法</b></p>
+    <ul>
+      <li>AES-128 CFB mode</li>
+      <li>IV：固定為 <code>[0x00 .. 0x0F]</code></li>
+      <li>Key 派生：<code>MD5(password)</code></li>
+      <li>檔名與 Key 儲存於 Footer（與手機版一致）</BR>
+          這也是為何加密會被破解還原的主要原因 <span style="color: rgb(255, 64, 128);">不須原始密碼 即可還原檔案</span></BR>
+          優點: 個人使用 不影響 使用體驗 單純作為防窺的用途</BR>
+          缺點: 安全性較弱，容易被破解
+      </li>
+    </ul>
+    <pre>Key = MD5(password)[:16]
+Cipher = AES-CFB-128(Key, IV=[0x00..0x0F])</pre>
+    <p><b>ESLock 檔案結構</b></p>
+    <pre>[ Encrypted Data Stream ]
+[ Optional Partial Encryption ]
+[ Footer ]
+  ├─ Flags (0x04 = partial, 0xFF = full)
+  ├─ Block Size
+  ├─ Encrypted Original Filename
+  ├─ Embedded AES Key
+  ├─ CRC32 Integrity Check
+  └─ Footer Length</pre>
+  </div>
+  <div class="en">
+    <p><b>Encryption Algorithm</b></p>
+    <ul>
+      <li>AES-128 CFB mode</li>
+      <li>IV: fixed <code>[0x00 .. 0x0F]</code></li>
+      <li>Key derivation: <code>MD5(password)</code></li>
+      <li>Filename and Key stored in Footer (matches mobile app)<br>
+          This is the primary reason why the encryption can be cracked and restored <br> — <span style="color: rgb(255, 64, 128);">no original password needed to recover the file</span><br>
+          Pro: designed for personal use; does not affect user experience; purely for privacy from casual viewers<br>
+          Con: weak security — easily cracked
+      </li>
+    </ul>
+    <pre>Key = MD5(password)[:16]
+Cipher = AES-CFB-128(Key, IV=[0x00..0x0F])</pre>
+    <p><b>ESLock File Layout</b></p>
+    <pre>[ Encrypted Data Stream ]
+[ Optional Partial Encryption ]
+[ Footer ]
+  ├─ Flags (0x04 = partial, 0xFF = full)
+  ├─ Block Size
+  ├─ Encrypted Original Filename
+  ├─ Embedded AES Key
+  ├─ CRC32 Integrity Check
+  └─ Footer Length</pre>
+  </div>
+
+  <!-- ===== File Layout Diagram (shared, language-neutral) ===== -->
+  <p style="margin:24px 0 10px;font-size:.9rem;color:var(--muted)">
+    <span class="zhi">▼ 檔案區塊示意圖（依比例）</span>
+    <span class="eni">▼ File block diagram (proportional)</span>
+  </p>
+  <svg id="svgLayout" viewBox="0 0 860 220" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <!--
+      Row 1 — proportional top-level blocks (total 860px)
+        Encrypted Data Stream : 55% → 473px
+        Partial Enc (optional): 15% → 129px
+        Footer                : 30% → 258px
+      Row 2 — Footer sub-blocks expanded to full 860px
+        scale = 860/258 ≈ 3.333
+        Flags 43→143 | BlockSize 43→143 | Filename 69→230
+        AESKey 60→200 | CRC32 26→87 | FtrLen 17→57
+    -->
+
+    <!-- ── Row 1 ── -->
+    <rect x="0"   y="10" width="473" height="52" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <rect x="473" y="10" width="129" height="52" rx="0" fill="#3b2f1e" stroke="#facc15" stroke-width="1.5"/>
+    <rect x="602" y="10" width="258" height="52" rx="0" fill="#1a2e1a" stroke="#34d399" stroke-width="1.5"/>
+
+    <text x="236" y="31" font-family="system-ui" font-size="12" fill="#60a5fa" text-anchor="middle">Encrypted Data Stream</text>
+    <text x="236" y="50" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">主體加密內容</tspan><tspan class="eni">Main encrypted body</tspan>
+    </text>
+    <text x="537" y="31" font-family="system-ui" font-size="11" fill="#facc15" text-anchor="middle">Partial Enc.</text>
+    <text x="537" y="48" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">(選用)</tspan><tspan class="eni">(optional)</tspan>
+    </text>
+    <text x="731" y="31" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">Footer</text>
+    <text x="731" y="48" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">~30 bytes</text>
+
+    <!-- ── Zoom connector: Footer (x=602~860) fans out to full width ── -->
+    <line x1="602" y1="62" x2="0"   y2="108" stroke="#34d399" stroke-width="1"   stroke-dasharray="5,3" opacity="0.55"/>
+    <line x1="860" y1="62" x2="860" y2="108" stroke="#34d399" stroke-width="1"   stroke-dasharray="5,3" opacity="0.55"/>
+    <!-- zoom label -->
+    <text x="430" y="92" font-family="system-ui" font-size="11" fill="#34d399" text-anchor="middle" opacity="0.85">
+      <tspan class="zhi">▼ Footer 展開（依欄位比例，整列顯示）</tspan>
+      <tspan class="eni">▼ Footer breakdown — expanded to full width</tspan>
+    </text>
+
+    <!-- ── Row 2: Footer sub-blocks full-width ── -->
+    <rect x="0"   y="110" width="143" height="66" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.3"/>
+    <rect x="143" y="110" width="143" height="66" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.3"/>
+    <rect x="286" y="110" width="230" height="66" rx="0" fill="#100a22" stroke="#a78bfa" stroke-width="1.3"/>
+    <rect x="516" y="110" width="200" height="66" rx="0" fill="#1a0a0a" stroke="#f87171" stroke-width="1.3"/>
+    <rect x="716" y="110" width="87"  height="66" rx="0" fill="#1a1500" stroke="#facc15" stroke-width="1.3"/>
+    <rect x="803" y="110" width="57"  height="66" rx="0" fill="#0a1020" stroke="#60a5fa" stroke-width="1.3"/>
+
+    <!-- Row 2 labels -->
+    <text x="71"  y="132" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">Flags</text>
+    <text x="71"  y="149" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">0x04 / 0xFF</text>
+    <text x="71"  y="163" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">partial / full</tspan><tspan class="eni">partial / full</tspan>
+    </text>
+
+    <text x="214" y="132" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">Block Size</text>
+    <text x="214" y="149" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">加密區塊大小</tspan><tspan class="eni">enc. block size</tspan>
+    </text>
+
+    <text x="401" y="128" font-family="system-ui" font-size="12" fill="#a78bfa" text-anchor="middle">Encrypted Filename</text>
+    <text x="401" y="145" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">加密原始檔名</tspan><tspan class="eni">encrypted original filename</tspan>
+    </text>
+
+    <text x="616" y="128" font-family="system-ui" font-size="12" fill="#f87171" text-anchor="middle">Embedded AES Key</text>
+    <text x="616" y="145" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">嵌入的 AES 金鑰</tspan><tspan class="eni">embedded AES key</tspan>
+    </text>
+    <text x="616" y="163" font-family="system-ui" font-size="9"  fill="#f87171" text-anchor="middle">
+      <tspan class="zhi">⚠ 無需密碼可取出</tspan><tspan class="eni">⚠ extractable w/o password</tspan>
+    </text>
+
+    <text x="759" y="132" font-family="system-ui" font-size="11" fill="#facc15" text-anchor="middle">CRC32</text>
+    <text x="759" y="149" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">完整性驗證</tspan><tspan class="eni">integrity check</tspan>
+    </text>
+
+    <text x="831" y="132" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">Footer</text>
+    <text x="831" y="148" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">Length</text>
+    <text x="831" y="163" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">總長度</tspan><tspan class="eni">total len</tspan>
+    </text>
+  </svg>
+  <button class="btn" style="margin-top:10px" onclick="exportSVG('svgLayout','eslock_file_layout.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+</div>
+</section>
+
+<!-- ===== Partial Encryption ===== -->
+<section id="eslock-partial">
+<div class="icon-title">⚡ <span class="zhi">部分加密機制</span><span class="eni">Partial Encryption Mechanism</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh">
+    <ul>
+      <li>只加密檔案<strong>前 N bytes + 後 N bytes</strong></li>
+      <li>中間資料保持原樣（速度極快）</li>
+      <li>適合影片、備份、同步資料</li>
+    </ul>
+    <pre>[ AES(head) ][ plain middle ][ AES(tail) ][ footer ]</pre>
+    <p><b>⚠ Security Notice：</b>部分加密保護 Metadata 與檔頭，但無法保護完整機密性。</p>
+  </div>
+  <div class="en">
+    <ul>
+      <li>Only encrypts <strong>first N bytes + last N bytes</strong> of the file</li>
+      <li>Middle data remains plaintext (extremely fast)</li>
+      <li>Suitable for videos, backups, and sync data</li>
+    </ul>
+    <pre>[ AES(head) ][ plain middle ][ AES(tail) ][ footer ]</pre>
+    <p><b>⚠ Security Notice:</b> Partial encryption protects metadata and file headers but does NOT guarantee full confidentiality.</p>
+  </div>
+
+  <!-- ===== Partial Encryption Diagram (shared) ===== -->
+  <p style="margin:24px 0 10px;font-size:.9rem;color:var(--muted)">
+    <span class="zhi">▼ 部分加密結構示意圖（依比例）</span>
+    <span class="eni">▼ Partial encryption layout (proportional)</span>
+  </p>
+  <svg id="svgPartial" viewBox="0 0 860 148" width="100%" xmlns="http://www.w3.org/2000/svg">
+
+    <!-- ── Blocks ── -->
+    <!-- AES(head): ~15% → 129px -->
+    <rect x="0"   y="18" width="129" height="64" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <!-- Plain Middle: ~65% → 559px -->
+    <rect x="129" y="18" width="559" height="64" rx="0" fill="#151520" stroke="#475569" stroke-width="1.5"/>
+    <!-- AES(tail): ~15% → 129px -->
+    <rect x="688" y="18" width="129" height="64" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <!-- Footer: ~5% → 43px -->
+    <rect x="817" y="18" width="43"  height="64" rx="0" fill="#1a2e1a" stroke="#34d399" stroke-width="1.5"/>
+
+    <!-- ── Block labels ── -->
+    <text x="64"  y="40" font-family="system-ui" font-size="12" fill="#60a5fa" text-anchor="middle">AES(head)</text>
+    <text x="64"  y="57" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">加密頭部 N bytes</tspan><tspan class="eni">encrypted N bytes</tspan>
+    </text>
+    <text x="64"  y="72" font-family="system-ui" font-size="9" fill="#60a5fa" text-anchor="middle">🔒</text>
+
+    <text x="408" y="40" font-family="system-ui" font-size="13" fill="#64748b" text-anchor="middle">Plain Middle</text>
+    <text x="408" y="57" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">未加密中段（明文，可被直接讀取）</tspan><tspan class="eni">unencrypted body — plaintext, directly readable</tspan>
+    </text>
+    <text x="408" y="73" font-family="system-ui" font-size="10" fill="#f87171" text-anchor="middle">
+      <tspan class="zhi">⚠ 內容未受保護</tspan><tspan class="eni">⚠ content unprotected</tspan>
+    </text>
+
+    <text x="752" y="40" font-family="system-ui" font-size="12" fill="#60a5fa" text-anchor="middle">AES(tail)</text>
+    <text x="752" y="57" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">加密尾部 N bytes</tspan><tspan class="eni">encrypted N bytes</tspan>
+    </text>
+    <text x="752" y="72" font-family="system-ui" font-size="9" fill="#60a5fa" text-anchor="middle">🔒</text>
+
+    <text x="838" y="40" font-family="system-ui" font-size="11" fill="#34d399" text-anchor="middle">Footer</text>
+    <text x="838" y="55" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">元資料</tspan><tspan class="eni">meta</tspan>
+    </text>
+
+    <!-- ── Legend ── -->
+    <rect x="0"   y="100" width="12" height="12" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1"/>
+    <text x="17"  y="111" font-family="system-ui" font-size="11" fill="#9aa4b2">
+      <tspan class="zhi">AES-128-CFB 加密區塊</tspan><tspan class="eni">AES-128-CFB encrypted</tspan>
+    </text>
+    <rect x="260" y="100" width="12" height="12" fill="#151520" stroke="#475569" stroke-width="1"/>
+    <text x="277" y="111" font-family="system-ui" font-size="11" fill="#9aa4b2">
+      <tspan class="zhi">明文（速度優先，無保護）</tspan><tspan class="eni">Plaintext (speed priority, unprotected)</tspan>
+    </text>
+    <rect x="580" y="100" width="12" height="12" fill="#1a2e1a" stroke="#34d399" stroke-width="1"/>
+    <text x="597" y="111" font-family="system-ui" font-size="11" fill="#9aa4b2">
+      <tspan class="zhi">Footer 元資料</tspan><tspan class="eni">Footer metadata</tspan>
+    </text>
+  </svg>
+  <button class="btn" style="margin-top:10px" onclick="exportSVG('svgPartial','eslock_partial_layout.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+
+  <!-- ===== ESLock Detailed File Structure Diagram ===== -->
+  <p style="margin:32px 0 10px;font-size:.9rem;color:var(--muted)">
+    <span class="zhi">▼ ESLock 完整檔案結構（Full / Partial 兩種模式對比）</span>
+    <span class="eni">▼ ESLock complete file structure — Full vs. Partial mode</span>
+  </p>
+  <svg id="svgEslockDetail" viewBox="0 0 860 310" width="100%" xmlns="http://www.w3.org/2000/svg">
+
+    <!-- ════ Row A: Full Encryption Mode ════ -->
+    <text x="0" y="16" font-family="system-ui" font-size="12" fill="#facc15" font-weight="bold">
+      <tspan class="zhi">● Full 模式（全文加密）</tspan><tspan class="eni">● Full Mode (entire file encrypted)</tspan>
+    </text>
+    <!-- AES Full Stream: 84% → 722px -->
+    <rect x="0"   y="22" width="722" height="54" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <!-- Footer: 16% → 138px -->
+    <rect x="722" y="22" width="138" height="54" rx="0" fill="#1a2e1a" stroke="#34d399" stroke-width="1.5"/>
+
+    <text x="361" y="43" font-family="system-ui" font-size="13" fill="#60a5fa" text-anchor="middle">AES-128-CFB Encrypted Stream</text>
+    <text x="361" y="62" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">完整檔案內容，全部加密 🔒</tspan><tspan class="eni">entire file content, fully encrypted 🔒</tspan>
+    </text>
+    <text x="791" y="43" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">Footer</text>
+    <text x="791" y="60" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">Flags=0xFF</text>
+
+    <!-- ════ Row B: Partial Encryption Mode ════ -->
+    <text x="0" y="104" font-family="system-ui" font-size="12" fill="#facc15" font-weight="bold">
+      <tspan class="zhi">● Partial 模式（僅加密頭尾）</tspan><tspan class="eni">● Partial Mode (head + tail only)</tspan>
+    </text>
+    <!-- AES head: 12% → 103px -->
+    <rect x="0"   y="110" width="103" height="54" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <!-- Plain Middle: 60% → 516px -->
+    <rect x="103" y="110" width="516" height="54" rx="0" fill="#13131e" stroke="#475569" stroke-width="1.5"/>
+    <!-- AES tail: 12% → 103px -->
+    <rect x="619" y="110" width="103" height="54" rx="0" fill="#1e3a5f" stroke="#60a5fa" stroke-width="1.5"/>
+    <!-- Footer: 16% → 138px -->
+    <rect x="722" y="110" width="138" height="54" rx="0" fill="#1a2e1a" stroke="#34d399" stroke-width="1.5"/>
+
+    <text x="51"  y="131" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">AES(head)</text>
+    <text x="51"  y="148" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">加密頭部</tspan><tspan class="eni">enc. head</tspan>
+    </text>
+    <text x="51"  y="159" font-family="system-ui" font-size="9"  fill="#60a5fa" text-anchor="middle">🔒</text>
+
+    <text x="361" y="131" font-family="system-ui" font-size="13" fill="#475569" text-anchor="middle">Plain Middle</text>
+    <text x="361" y="148" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">未加密中段內容（明文可讀）</tspan><tspan class="eni">unencrypted body — plaintext readable</tspan>
+    </text>
+    <text x="361" y="160" font-family="system-ui" font-size="10" fill="#f87171" text-anchor="middle">
+      <tspan class="zhi">⚠ 無加密保護</tspan><tspan class="eni">⚠ no encryption</tspan>
+    </text>
+
+    <text x="670" y="131" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">AES(tail)</text>
+    <text x="670" y="148" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">加密尾部</tspan><tspan class="eni">enc. tail</tspan>
+    </text>
+    <text x="670" y="159" font-family="system-ui" font-size="9"  fill="#60a5fa" text-anchor="middle">🔒</text>
+
+    <text x="791" y="131" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">Footer</text>
+    <text x="791" y="148" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">Flags=0x04</text>
+
+    <!-- ════ Footer zoom connector ════ -->
+    <!-- Fan from Footer column (x=722..860, y=164) to full width (x=0..860, y=198) -->
+    <line x1="722" y1="164" x2="0"   y2="198" stroke="#34d399" stroke-width="1" stroke-dasharray="5,3" opacity="0.5"/>
+    <line x1="860" y1="164" x2="860" y2="198" stroke="#34d399" stroke-width="1" stroke-dasharray="5,3" opacity="0.5"/>
+    <text x="430" y="188" font-family="system-ui" font-size="11" fill="#34d399" text-anchor="middle" opacity="0.9">
+      <tspan class="zhi">▼ Footer 欄位展開（兩種模式共用相同格式）</tspan>
+      <tspan class="eni">▼ Footer field breakdown — same format for both modes</tspan>
+    </text>
+
+    <!-- ════ Row C: Footer sub-fields full width ════ -->
+    <!-- Flags: ~17% → 143px -->
+    <rect x="0"   y="200" width="143" height="68" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.3"/>
+    <!-- Block Size: ~17% → 143px -->
+    <rect x="143" y="200" width="143" height="68" rx="0" fill="#0a1f10" stroke="#34d399" stroke-width="1.3"/>
+    <!-- Encrypted Filename: ~27% → 230px -->
+    <rect x="286" y="200" width="230" height="68" rx="0" fill="#100a22" stroke="#a78bfa" stroke-width="1.3"/>
+    <!-- Embedded AES Key: ~23% → 200px -->
+    <rect x="516" y="200" width="200" height="68" rx="0" fill="#1a0a0a" stroke="#f87171" stroke-width="1.3"/>
+    <!-- CRC32: ~10% → 87px -->
+    <rect x="716" y="200" width="87"  height="68" rx="0" fill="#1a1500" stroke="#facc15" stroke-width="1.3"/>
+    <!-- Footer Length: ~7% → 57px -->
+    <rect x="803" y="200" width="57"  height="68" rx="0" fill="#0a1020" stroke="#60a5fa" stroke-width="1.3"/>
+
+    <!-- Row C labels -->
+    <text x="71"  y="222" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">Flags</text>
+    <text x="71"  y="238" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">1 byte</text>
+    <text x="71"  y="253" font-family="system-ui" font-size="9"  fill="#34d399" text-anchor="middle">0x04=partial</text>
+    <text x="71"  y="264" font-family="system-ui" font-size="9"  fill="#34d399" text-anchor="middle">0xFF=full</text>
+
+    <text x="214" y="222" font-family="system-ui" font-size="12" fill="#34d399" text-anchor="middle">Block Size</text>
+    <text x="214" y="238" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">4 bytes</text>
+    <text x="214" y="253" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">加密區塊大小 N</tspan><tspan class="eni">enc. block size N</tspan>
+    </text>
+
+    <text x="401" y="219" font-family="system-ui" font-size="12" fill="#a78bfa" text-anchor="middle">Encrypted Filename</text>
+    <text x="401" y="235" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">variable bytes</text>
+    <text x="401" y="250" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">AES 加密後的原始檔名</tspan><tspan class="eni">AES-encrypted original filename</tspan>
+    </text>
+
+    <text x="616" y="219" font-family="system-ui" font-size="12" fill="#f87171" text-anchor="middle">Embedded AES Key</text>
+    <text x="616" y="235" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">16 bytes</text>
+    <text x="616" y="250" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">明文儲存的 AES 金鑰</tspan><tspan class="eni">AES key stored in plaintext</tspan>
+    </text>
+    <text x="616" y="263" font-family="system-ui" font-size="9"  fill="#f87171" text-anchor="middle">
+      <tspan class="zhi">⚠ 無需密碼即可取出</tspan><tspan class="eni">⚠ extractable without password</tspan>
+    </text>
+
+    <text x="759" y="222" font-family="system-ui" font-size="11" fill="#facc15" text-anchor="middle">CRC32</text>
+    <text x="759" y="237" font-family="system-ui" font-size="10" fill="#9aa4b2" text-anchor="middle">4 bytes</text>
+    <text x="759" y="252" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">完整性驗證</tspan><tspan class="eni">integrity check</tspan>
+    </text>
+
+    <text x="831" y="222" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">Footer</text>
+    <text x="831" y="237" font-family="system-ui" font-size="11" fill="#60a5fa" text-anchor="middle">Length</text>
+    <text x="831" y="252" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">4 bytes</text>
+    <text x="831" y="263" font-family="system-ui" font-size="9"  fill="#9aa4b2" text-anchor="middle">
+      <tspan class="zhi">結尾偏移量</tspan><tspan class="eni">end offset</tspan>
+    </text>
+
+  </svg>
+  <button class="btn" style="margin-top:10px" onclick="exportSVG('svgEslockDetail','eslock_detail_structure.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+</div>
+</section>
+
+<!-- ===== KVH Design Goals ===== -->
+<section id="kvh-design">
+<div class="icon-title">🔒 <span class="zhi">KVH Locker 設計理念</span><span class="eni">KVH Locker Design Goals</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh">
+    <p><b>核心設計原則</b></p>
+    <ul>
+      <li>🚀 <b>極速加密</b>：採用串流模式（AES-CFB），大型檔案亦可快速處理，無需填充</li>
+      <li>👁️ <b>低可識別性</b>：輸出不含任何可辨識的 Magic Bytes 或固定標頭，外觀接近隨機雜訊</li>
+      <li>🧠 <b>格式抗辨析</b>：不符合任何已知加密格式（非 ESLock / ZIP / PGP / VeraCrypt），難以透過檔案特徵辨別</li>
+      <li>🔐 <b>現代密碼學配置</b>：以 PBKDF2-HMAC-SHA256（600k iterations）做金鑰強化，有效抵抗暴力破解</li>
+      <li>🔗 <b>完整性驗證</b>：每個檔案附加 HMAC-SHA256，確保資料未被竄改後才允許解密</li>
+      <li>🗝️ <b>無金鑰嵌入</b>：不將金鑰或密碼以任何形式儲存於輸出檔案（對比 ESLock 的弱點）</li>
+      <li>🔄 <b>隨機 IV</b>：每次加密產生全新隨機 IV，相同明文不會產生相同密文</li>
+    </ul>
+
+    <p><b>與 ESLock 的關鍵差異</b></p>
+    <table>
+      <thead><tr><th>特性</th><th>ESLock</th><th>KVH Locker</th></tr></thead>
+      <tbody>
+        <tr><td>金鑰派生</td><td><code>MD5(password)</code></td><td><code>PBKDF2-HMAC-SHA256</code> × 600k</td></tr>
+        <tr><td>IV</td><td>固定 <code>[0x00..0x0F]</code></td><td>隨機 16 bytes</td></tr>
+        <tr><td>金鑰嵌入檔案</td><td>✅ 明文嵌入</td><td>❌ 不嵌入</td></tr>
+        <tr><td>完整性驗證</td><td>CRC32（弱）</td><td>HMAC-SHA256</td></tr>
+        <tr><td>格式可識別度</td><td>高（有特徵標頭）</td><td>極低（偽隨機）</td></tr>
+        <tr><td>無密碼可還原</td><td>⚠️ 可以</td><td>❌ 不可</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:24px"><b>KVH 金鑰層級架構</b></p>
+    <pre>User Password
+   ↓ PBKDF2-HMAC-SHA256
+   ↓   salt = random 16 bytes
+   ↓   iterations = 600,000
+   ↓   dkLen = 32 bytes
+Master Key (32 bytes)
+   ↓ SHA256(Master Key + IV)
+File Key (32 bytes)
+   ↓ AES-256-CFB, IV = random 16 bytes
+Encrypted Ciphertext
+   ↓ HMAC-SHA256(File Key, Ciphertext)
+Auth Tag (32 bytes) → appended to file</pre>
+
+    <p><b>檔案格式（Header）</b></p>
+    <pre>[ Magic / Version  :  4 bytes  ]  ← 內部識別，不對外暴露
+[ Salt             : 16 bytes  ]  ← 隨機鹽值，用於 PBKDF2
+[ IV               : 16 bytes  ]  ← 隨機初始向量
+[ Ciphertext       :  N bytes  ]  ← AES-256-CFB 加密內容
+[ HMAC-SHA256      : 32 bytes  ]  ← 完整性驗證碼（結尾）</pre>
+  </div>
+
+  <div class="en">
+    <p><b>Core Design Principles</b></p>
+    <ul>
+      <li>🚀 <b>High-speed encryption</b>: AES-CFB stream mode handles large files without padding overhead</li>
+      <li>👁️ <b>Low identifiability</b>: output contains no recognizable magic bytes or fixed headers — resembles random noise</li>
+      <li>🧠 <b>Format anti-fingerprinting</b>: does not match any known encrypted format (not ESLock / ZIP / PGP / VeraCrypt)</li>
+      <li>🔐 <b>Modern key derivation</b>: PBKDF2-HMAC-SHA256 with 600,000 iterations effectively resists brute-force attacks</li>
+      <li>🔗 <b>Integrity verification</b>: HMAC-SHA256 appended to each file; decryption is refused if authentication fails</li>
+      <li>🗝️ <b>No embedded key</b>: neither the key nor password is stored in the output file (contrast with ESLock's design)</li>
+      <li>🔄 <b>Random IV per file</b>: a fresh random IV is generated each time, so identical plaintexts produce different ciphertexts</li>
+    </ul>
+
+    <p><b>Key Differences vs. ESLock</b></p>
+    <table>
+      <thead><tr><th>Feature</th><th>ESLock</th><th>KVH Locker</th></tr></thead>
+      <tbody>
+        <tr><td>Key derivation</td><td><code>MD5(password)</code></td><td><code>PBKDF2-HMAC-SHA256</code> × 600k</td></tr>
+        <tr><td>IV</td><td>Fixed <code>[0x00..0x0F]</code></td><td>Random 16 bytes</td></tr>
+        <tr><td>Key embedded in file</td><td>✅ Plaintext</td><td>❌ Never</td></tr>
+        <tr><td>Integrity check</td><td>CRC32 (weak)</td><td>HMAC-SHA256</td></tr>
+        <tr><td>Format identifiability</td><td>High (signature header)</td><td>Very low (pseudo-random)</td></tr>
+        <tr><td>Recoverable without password</td><td>⚠️ Yes</td><td>❌ No</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:24px"><b>KVH Key Hierarchy</b></p>
+    <pre>User Password
+   ↓ PBKDF2-HMAC-SHA256
+   ↓   salt = random 16 bytes
+   ↓   iterations = 600,000
+   ↓   dkLen = 32 bytes
+Master Key (32 bytes)
+   ↓ SHA256(Master Key + IV)
+File Key (32 bytes)
+   ↓ AES-256-CFB, IV = random 16 bytes
+Encrypted Ciphertext
+   ↓ HMAC-SHA256(File Key, Ciphertext)
+Auth Tag (32 bytes) → appended to file</pre>
+
+    <p><b>File Format (Header Layout)</b></p>
+    <pre>[ Magic / Version  :  4 bytes  ]  ← internal ID, not exposed externally
+[ Salt             : 16 bytes  ]  ← random salt for PBKDF2
+[ IV               : 16 bytes  ]  ← random initialisation vector
+[ Ciphertext       :  N bytes  ]  ← AES-256-CFB encrypted content
+[ HMAC-SHA256      : 32 bytes  ]  ← integrity authentication tag (end)</pre>
+  </div>
+</div>
+</section>
+
+<!-- ===== ESLock Flow ===== -->
+<section id="eslock-flow">
+<div class="icon-title">⚡ <span class="zhi">ESLock 加密流程</span><span class="eni">ESLock Encryption Flow</span></div>
+<div class="divider"></div>
+<div class="panel">
+<svg id="svgEslock" viewBox="0 0 900 200" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/>
+    </marker>
+  </defs>
+  <!-- nodes -->
+  <rect x="20"  y="70" width="140" height="60" rx="8" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+  <rect x="210" y="70" width="160" height="60" rx="8" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+  <rect x="430" y="10" width="160" height="60" rx="8" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+  <rect x="430" y="130" width="160" height="60" rx="8" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+  <rect x="660" y="70" width="160" height="60" rx="8" fill="#020617" stroke="#34d399" stroke-width="1.5"/>
+  <!-- labels zh -->
+  <g class="zhi" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">
+    <text x="90"  y="96">輸入檔案</text>
+    <text x="90"  y="114">Input File</text>
+    <text x="290" y="96">部分加密判斷</text>
+    <text x="290" y="114">(大小 / 模式)</text>
+    <text x="510" y="36">加密 頭尾</text>
+    <text x="510" y="52">Encrypt Head/Tail</text>
+    <text x="510" y="156">全文加密</text>
+    <text x="510" y="172">Encrypt Full</text>
+    <text x="740" y="96">附加 Footer</text>
+    <text x="740" y="114">Append Footer</text>
+  </g>
+  <!-- labels en -->
+  <g class="eni" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">
+    <text x="90"  y="104">Input File</text>
+    <text x="290" y="96">Partial Decision</text>
+    <text x="290" y="114">(Size / Mode)</text>
+    <text x="510" y="44">Encrypt Head/Tail</text>
+    <text x="510" y="164">Encrypt Full</text>
+    <text x="740" y="104">Append Footer</text>
+  </g>
+  <!-- arrows -->
+  <line x1="160" y1="100" x2="208" y2="100" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M370,90 C400,90 410,40 428,40"  fill="none" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M370,110 C400,110 410,160 428,160" fill="none" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M590,40 C630,40 640,90 658,90"  fill="none" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr)"/>
+  <path d="M590,160 C630,160 640,110 658,110" fill="none" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr)"/>
+</svg>
+<button class="btn" style="margin-top:12px" onclick="exportSVG('svgEslock','eslock_flow.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+</div>
+</section>
+
+<!-- ===== KVH Flow ===== -->
+<section id="kvh-flow">
+<div class="icon-title">🔒 <span class="zhi">KVH 加密流程</span><span class="eni">KVH Cryptographic Flow</span></div>
+<div class="divider"></div>
+<div class="panel">
+<svg id="svgKvh" viewBox="0 0 900 160" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#a78bfa"/>
+    </marker>
+  </defs>
+  <rect x="20"  y="50" width="160" height="60" rx="8" fill="#020617" stroke="#a78bfa" stroke-width="1.5"/>
+  <rect x="230" y="50" width="200" height="60" rx="8" fill="#020617" stroke="#a78bfa" stroke-width="1.5"/>
+  <rect x="480" y="50" width="160" height="60" rx="8" fill="#020617" stroke="#a78bfa" stroke-width="1.5"/>
+  <rect x="690" y="50" width="190" height="60" rx="8" fill="#020617" stroke="#34d399" stroke-width="1.5"/>
+  <!-- labels -->
+  <g font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">
+    <text x="100" y="78"><tspan class="zhi">密碼</tspan><tspan class="eni">Password</tspan></text>
+    <text x="100" y="96">Password</text>
+    <text x="330" y="74">PBKDF2-HMAC-SHA256</text>
+    <text x="330" y="94">(600k iterations)</text>
+    <text x="560" y="78"><tspan class="zhi">檔案金鑰</tspan><tspan class="eni">File Key</tspan></text>
+    <text x="560" y="96">File Key</text>
+    <text x="785" y="74">AES Encrypt</text>
+    <text x="785" y="94">+ HMAC-SHA256</text>
+  </g>
+  <line x1="180" y1="80" x2="228" y2="80" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <line x1="430" y1="80" x2="478" y2="80" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <line x1="640" y1="80" x2="688" y2="80" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arr2)"/>
+</svg>
+<button class="btn" style="margin-top:12px" onclick="exportSVG('svgKvh','kvh_flow.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+</div>
+</section>
+
+<!-- ===== Data Lifecycle ===== -->
+<section id="lifecycle">
+<div class="icon-title">🔁 <span class="zhi">資料生命週期</span><span class="eni">Data Lifecycle</span></div>
+<div class="divider"></div>
+<div class="panel">
+<svg id="svgLifecycle" viewBox="0 0 900 160" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#60a5fa"/>
+    </marker>
+  </defs>
+  <rect x="20"  y="50" width="150" height="60" rx="8" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+  <rect x="220" y="50" width="150" height="60" rx="8" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+  <rect x="420" y="50" width="210" height="60" rx="8" fill="#020617" stroke="#facc15" stroke-width="1.5"/>
+  <rect x="690" y="50" width="150" height="60" rx="8" fill="#020617" stroke="#34d399" stroke-width="1.5"/>
+  <g font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle">
+    <text x="95"  y="76"><tspan class="zhi">明文資料</tspan><tspan class="eni">Plain Data</tspan></text>
+    <text x="95"  y="94">Plain Data</text>
+    <text x="295" y="76"><tspan class="zhi">金鑰派生</tspan><tspan class="eni">Key Derive</tspan></text>
+    <text x="295" y="94">Key Derive</text>
+    <text x="525" y="72"><tspan class="zhi">加密</tspan><tspan class="eni">Encrypt</tspan></text>
+    <text x="525" y="90">Encrypt</text>
+    <text x="525" y="104">+ Footer / HMAC</text>
+    <text x="765" y="76"><tspan class="zhi">存檔</tspan><tspan class="eni">Archive</tspan></text>
+    <text x="765" y="94">Archive</text>
+  </g>
+  <line x1="170" y1="80" x2="218" y2="80" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr4)"/>
+  <line x1="370" y1="80" x2="418" y2="80" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr4)"/>
+  <line x1="630" y1="80" x2="688" y2="80" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arr4)"/>
+</svg>
+<button class="btn" style="margin-top:12px" onclick="exportSVG('svgLifecycle','data_lifecycle.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+</div>
+</section>
+
+<!-- ===== Attack Surface ===== -->
+<section id="attack">
+<div class="icon-title">🎯 <span class="zhi">攻擊面</span><span class="eni">Attack Surface</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh"><p>攻擊者可接觸之面包含使用者輸入、檔案系統與加密後資料，防禦邊界由加密邏輯與完整性驗證組成。</p></div>
+  <div class="en"><p>The attack surface includes user input, filesystem access, and encrypted artifacts. Defense boundaries consist of encryption logic and integrity validation.</p></div>
+  <svg id="svgAttack" viewBox="0 0 900 260" width="100%" xmlns="http://www.w3.org/2000/svg" style="margin-top:20px">
+    <defs>
+      <marker id="arr3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+      </marker>
+    </defs>
+    <!-- Security boundary -->
+    <rect x="260" y="20" width="380" height="220" rx="12" fill="none" stroke="#60a5fa" stroke-dasharray="6,4" stroke-width="1.5"/>
+    <text x="370" y="44" font-family="system-ui" font-size="12" fill="#60a5fa">Security Boundary</text>
+    <!-- Attacker -->
+    <rect x="20" y="100" width="160" height="60" rx="8" fill="#1a0000" stroke="#f87171" stroke-width="1.5"/>
+    <text x="100" y="128" font-family="system-ui" font-size="13" fill="#f87171" text-anchor="middle"><tspan class="zhi">攻擊者</tspan><tspan class="eni">Attacker</tspan></text>
+    <text x="100" y="146" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">Attacker</text>
+    <!-- Encryption Logic -->
+    <rect x="290" y="60" width="200" height="55" rx="8" fill="#021a0e" stroke="#34d399" stroke-width="1.5"/>
+    <text x="390" y="84" font-family="system-ui" font-size="13" fill="#34d399" text-anchor="middle"><tspan class="zhi">加密邏輯</tspan><tspan class="eni">Encryption Logic</tspan></text>
+    <text x="390" y="102" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">AES / PBKDF2</text>
+    <!-- Integrity -->
+    <rect x="290" y="150" width="200" height="55" rx="8" fill="#021a0e" stroke="#34d399" stroke-width="1.5"/>
+    <text x="390" y="174" font-family="system-ui" font-size="13" fill="#34d399" text-anchor="middle"><tspan class="zhi">完整性驗證</tspan><tspan class="eni">Integrity Check</tspan></text>
+    <text x="390" y="192" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">HMAC-SHA256</text>
+    <!-- Storage -->
+    <rect x="690" y="100" width="180" height="60" rx="8" fill="#020617" stroke="#60a5fa" stroke-width="1.5"/>
+    <text x="780" y="128" font-family="system-ui" font-size="13" fill="#e5e7eb" text-anchor="middle"><tspan class="zhi">加密儲存</tspan><tspan class="eni">Encrypted Storage</tspan></text>
+    <text x="780" y="146" font-family="system-ui" font-size="11" fill="#9aa4b2" text-anchor="middle">.eslock / .kvh</text>
+    <!-- arrows -->
+    <line x1="180" y1="130" x2="288" y2="100" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr3)"/>
+    <line x1="180" y1="130" x2="288" y2="170" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr3)"/>
+    <line x1="490" y1="100" x2="688" y2="120" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr3)"/>
+    <line x1="490" y1="170" x2="688" y2="140" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr3)"/>
+  </svg>
+  <button class="btn" style="margin-top:12px" onclick="exportSVG('svgAttack','attack_surface.svg')">⬇ <span class="zhi">下載 SVG</span><span class="eni">Download SVG</span></button>
+</div>
+</section>
+
+<!-- ===== Comparison ===== -->
+<section id="compare">
+<div class="icon-title">📊 <span class="zhi">方案比較</span><span class="eni">Solution Comparison</span></div>
+<div class="divider"></div>
+<div class="panel">
+<table>
+<thead><tr>
+  <th><span class="zhi">方案</span><span class="eni">Solution</span></th>
+  <th><span class="zhi">速度</span><span class="eni">Speed</span></th>
+  <th><span class="zhi">安全性</span><span class="eni">Security</span></th>
+  <th><span class="zhi">可識別度</span><span class="eni">Identifiability</span></th>
+</tr></thead>
+<tbody>
+<tr>
+  <td>ESLock Partial</td><td>★★★★★</td><td>★☆☆☆☆</td>
+  <td><span class="zhi">高</span><span class="eni">High</span></td>
+</tr>
+<tr>
+  <td>ESLock Full</td><td>★★★☆☆</td><td>★★★☆☆</td>
+  <td><span class="zhi">高</span><span class="eni">High</span></td>
+</tr>
+<tr>
+  <td>KVH Locker</td><td>★★★★☆</td><td>★★★★★</td>
+  <td><span class="zhi">極低</span><span class="eni">Very Low</span></td>
+</tr>
+<tr>
+  <td>ZIP + AES</td><td>★★☆☆☆</td><td>★★★☆☆</td>
+  <td><span class="zhi">高</span><span class="eni">High</span></td>
+</tr>
+<tr>
+  <td>VeraCrypt</td><td>★☆☆☆☆</td><td>★★★★★</td>
+  <td><span class="zhi">中</span><span class="eni">Medium</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<!-- ===== STRIDE ===== -->
+<section id="stride">
+<div class="icon-title">🛡️ <span class="zhi">STRIDE 威脅模型</span><span class="eni">STRIDE Threat Model</span></div>
+<div class="divider"></div>
+<div class="panel">
+<table>
+<thead><tr>
+  <th>Category</th>
+  <th><span class="zhi">威脅</span><span class="eni">Threat</span></th>
+  <th><span class="zhi">對策</span><span class="eni">Mitigation</span></th>
+</tr></thead>
+<tbody>
+<tr>
+  <td>Spoofing</td>
+  <td><span class="zhi">身份偽裝</span><span class="eni">Impersonation</span></td>
+  <td><span class="zhi">金鑰密碼學</span><span class="eni">Key-based cryptography</span></td>
+</tr>
+<tr>
+  <td>Tampering</td>
+  <td><span class="zhi">資料竄改</span><span class="eni">Data modification</span></td>
+  <td>CRC / HMAC</td>
+</tr>
+<tr>
+  <td>Repudiation</td>
+  <td><span class="zhi">操作否認</span><span class="eni">Action denial</span></td>
+  <td><span class="zhi">無集中授權機構</span><span class="eni">No central authority</span></td>
+</tr>
+<tr>
+  <td>Information Disclosure</td>
+  <td><span class="zhi">資訊外洩</span><span class="eni">Data leakage</span></td>
+  <td><span class="zhi">KVH 全加密</span><span class="eni">KVH full encryption</span></td>
+</tr>
+<tr>
+  <td>Denial of Service</td>
+  <td><span class="zhi">服務阻斷</span><span class="eni">Availability attack</span></td>
+  <td><span class="zhi">安全失敗設計</span><span class="eni">Fail-secure design</span></td>
+</tr>
+<tr>
+  <td>Elevation of Privilege</td>
+  <td><span class="zhi">權限提升</span><span class="eni">Unauthorized access</span></td>
+  <td><span class="zhi">OS 層邊界隔離</span><span class="eni">OS-level boundary</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<!-- ===== LINDDUN ===== -->
+<section id="linddun">
+<div class="icon-title">🕵️ <span class="zhi">LINDDUN 隱私模型</span><span class="eni">LINDDUN Privacy Model</span></div>
+<div class="divider"></div>
+<div class="panel">
+<table>
+<thead><tr>
+  <th>Category</th>
+  <th><span class="zhi">風險</span><span class="eni">Risk</span></th>
+  <th><span class="zhi">對策</span><span class="eni">Mitigation</span></th>
+</tr></thead>
+<tbody>
+<tr>
+  <td>Linkability</td>
+  <td><span class="zhi">跨檔關聯推斷</span><span class="eni">Cross-file correlation</span></td>
+  <td><span class="zhi">隨機 IV</span><span class="eni">Random IV</span></td>
+</tr>
+<tr>
+  <td>Identifiability</td>
+  <td><span class="zhi">使用者身份推斷</span><span class="eni">User inference</span></td>
+  <td><span class="zhi">格式混淆</span><span class="eni">Format obfuscation</span></td>
+</tr>
+<tr>
+  <td>Non-repudiation</td>
+  <td><span class="zhi">操作可追蹤性</span><span class="eni">Action traceability</span></td>
+  <td><span class="zhi">無集中記錄</span><span class="eni">No centralized logging</span></td>
+</tr>
+<tr>
+  <td>Detectability</td>
+  <td><span class="zhi">特徵掃描偵測</span><span class="eni">Signature detection</span></td>
+  <td><span class="zhi">標頭遮蔽</span><span class="eni">Masked header</span></td>
+</tr>
+<tr>
+  <td>Data Disclosure</td>
+  <td><span class="zhi">明文資訊外洩</span><span class="eni">Plaintext leakage</span></td>
+  <td><span class="zhi">KVH 全加密</span><span class="eni">KVH full encryption</span></td>
+</tr>
+<tr>
+  <td>Unawareness</td>
+  <td><span class="zhi">使用者誤解風險</span><span class="eni">User misunderstanding</span></td>
+  <td><span class="zhi">明確文件說明</span><span class="eni">Explicit documentation</span></td>
+</tr>
+<tr>
+  <td>Non-compliance</td>
+  <td><span class="zhi">法規違規風險</span><span class="eni">Legal misuse</span></td>
+  <td><span class="zhi">由使用者自行負責</span><span class="eni">User responsibility</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<!-- ===== Assumptions ===== -->
+<section id="assumptions">
+<div class="icon-title">✅ <span class="zhi">安全假設</span><span class="eni">Security Assumptions</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh"><ul>
+    <li>作業系統本身未被入侵</li>
+    <li>密碼安全由使用者自行承擔</li>
+    <li>系統不提供金鑰託管或恢復</li>
+  </ul></div>
+  <div class="en"><ul>
+    <li>Endpoint OS integrity is trusted</li>
+    <li>Password secrecy is the user's responsibility</li>
+    <li>No key escrow or recovery mechanism</li>
+  </ul></div>
+</div>
+</section>
+
+<!-- ===== Risk Assessment ===== -->
+<section id="risk">
+<div class="icon-title">⚠️ <span class="zhi">風險評估</span><span class="eni">Risk Assessment</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh"><ul>
+    <li>ESLock 使用 MD5（為相容性保留，非最佳實務）</li>
+    <li>Partial Encryption 不可防止內容抽取</li>
+    <li>Footer 明文位置可被取出（設計如此）</li>
+    <li>KVH Locker 密碼遺失 = 永久不可逆</li>
+  </ul></div>
+  <div class="en"><ul>
+    <li>ESLock uses MD5 (kept for compatibility, not best practice)</li>
+    <li>Partial Encryption cannot prevent content extraction</li>
+    <li>Footer location is readable in plaintext (by design)</li>
+    <li>KVH Locker password loss = permanent, irreversible data loss</li>
+  </ul></div>
+</div>
+</section>
+
+<!-- ===== Legal ===== -->
+<section id="legal">
+<div class="icon-title">⚖️ <span class="zhi">法務與合規聲明</span><span class="eni">Legal &amp; Compliance</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh"><p>本工具僅用於：</p>
+  <ul>
+    <li>✔ 個人資料保護</li>
+    <li>✔ 合法鑑識 / 數位證據</li>
+    <li>✔ 備份與隱私管理</li>
+    <li>❌ 禁止非法闖入、竊取、破壞他人資料</li>
+  </ul></div>
+  <div class="en"><p>This tool is intended only for:</p>
+  <ul>
+    <li>✔ Personal data protection</li>
+    <li>✔ Lawful forensics / digital evidence</li>
+    <li>✔ Backup and privacy management</li>
+    <li>❌ Unauthorized access, theft, or destruction of others' data is prohibited</li>
+  </ul></div>
+</div>
+</section>
+
+<!-- ===== Limits ===== -->
+<section id="limits">
+<div class="icon-title">⚠️ <span class="zhi">限制與風險</span><span class="eni">Limitations &amp; Risks</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh"><ul>
+    <li>Partial Encryption 並非完整機密性保障</li>
+    <li>密碼遺失即永久喪失資料</li>
+    <li>無法防止 OS 已遭入侵之情境</li>
+  </ul></div>
+  <div class="en"><ul>
+    <li>Partial encryption does not guarantee full confidentiality</li>
+    <li>Password loss results in permanent data loss</li>
+    <li>No protection against compromised operating systems</li>
+  </ul></div>
+</div>
+</section>
+
+<!-- ===== Conclusion ===== -->
+<section id="conclusion">
+<div class="icon-title">✅ <span class="zhi">結語</span><span class="eni">Conclusion</span></div>
+<div class="divider"></div>
+<div class="panel">
+  <div class="zh">
+    <p>ESLock 工具提供 <strong>100% 手機相容性</strong>，KVH Locker 則提供<strong>更高層級、低可辨識度的隱匿方案</strong>。</p>
+    <p>建議實務策略：</p>
+    <ul>
+      <li>📱 手機同步 → ESLock</li>
+      <li>🗄️ 私密歸檔 → KVH Locker</li>
+      <li>🧪 鑑識分析 → ESLockDecryptor</li>
+    </ul>
+  </div>
+  <div class="en">
+    <p>ESLock provides <strong>100% mobile compatibility</strong>. KVH Locker offers a <strong>higher-security, low-identifiability concealment solution</strong>.</p>
+    <p>Recommended usage strategy:</p>
+    <ul>
+      <li>📱 Mobile sync → ESLock</li>
+      <li>🗄️ Private archiving → KVH Locker</li>
+      <li>🧪 Forensic analysis → ESLockDecryptor</li>
+    </ul>
+  </div>
+</div>
+</section>
+
+</main>
+</div>
+
+<script>
+function exportSVG(id, filename) {
+  var svg  = document.getElementById(id);
+  var blob = new Blob([svg.outerHTML], {type: 'image/svg+xml'});
+  var a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function setLang(code) {
+  var isEn = (code === 'en');
+  document.body.classList.toggle('is-en', isEn);
+  document.getElementById('btn-zh').classList.toggle('active', !isEn);
+  document.getElementById('btn-en').classList.toggle('active',  isEn);
+  try { localStorage.setItem('lang', code); } catch(e) {}
+}
+
+(function () {
+  var lang = 'zh';
+  try {
+    var saved = localStorage.getItem('lang');
+    if (saved === 'zh' || saved === 'en') {
+      lang = saved;
+    } else {
+      var bl = (navigator.language || 'zh').toLowerCase();
+      if (!bl.startsWith('zh')) lang = 'en';
+    }
+  } catch(e) {
+    try {
+      if (!(navigator.language || 'zh').toLowerCase().startsWith('zh')) lang = 'en';
+    } catch(e2) {}
+  }
+  if (lang === 'en') setLang('en');
+})();
+
+var links = document.querySelectorAll('nav a');
+var secs  = document.querySelectorAll('section');
+window.addEventListener('scroll', function () {
+  var cur = '';
+  secs.forEach(function (s) { if (window.scrollY >= s.offsetTop - 120) cur = s.id; });
+  links.forEach(function (a) {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + cur);
+  });
+});
+</script>
+
+</body>
+</html>

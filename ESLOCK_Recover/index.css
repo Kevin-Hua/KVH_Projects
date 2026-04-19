@@ -1,0 +1,129 @@
+/* ===== Theme ===== */
+:root {
+  --bg:     #060c18;
+  --panel:  #0f172a;
+  --border: rgba(148,163,184,.18);
+  --text:   #e5e7eb;
+  --muted:  #9aa4b2;
+  --blue:   #60a5fa;
+  --yellow: #facc15;
+  --green:  #34d399;
+  --red:    #f87171;
+}
+
+/* ===== Base ===== */
+*, *::before, *::after { box-sizing: border-box; }
+html { min-height: 100%; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: system-ui, "Noto Sans TC", sans-serif;
+  background-color: #060c18;
+  background-image:
+    radial-gradient(1200px 600px at 5% -10%, rgba(96,165,250,.08), transparent),
+    radial-gradient(900px 520px at 95% 10%, rgba(167,139,250,.08), transparent);
+  color: #e5e7eb;
+}
+
+/* ===== Layout ===== */
+.wrapper { display: flex; max-width: 1500px; margin: auto; }
+nav {
+  width: 260px;
+  flex-shrink: 0;
+  padding: 28px 20px;
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+nav h3 { color: var(--yellow); margin-top: 0; }
+nav a {
+  display: block;
+  margin: 8px 0;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: .92rem;
+}
+nav a.active { color: var(--blue); }
+main { flex: 1; min-width: 0; padding: 56px 64px 120px; }
+
+/* ===== Sections ===== */
+section { margin-bottom: 120px; }
+.icon-title { display: flex; gap: 10px; font-size: 1.55rem; color: var(--yellow); }
+.divider {
+  height: 1px;
+  margin: 18px 0 32px;
+  background: linear-gradient(90deg, transparent, var(--blue), transparent);
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px;
+}
+.panel p { line-height: 1.85; }
+
+/* ===== Code blocks ===== */
+pre, code {
+  font-family: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+  font-size: .88em;
+}
+code {
+  background: #020617;
+  color: #34d399;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+pre {
+  background: #020617;
+  color: #e5e7eb;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  margin: 12px 0;
+  line-height: 1.6;
+}
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+}
+
+/* ===== Tables ===== */
+table { width: 100%; border-collapse: collapse; }
+th, td { border-bottom: 1px solid var(--border); padding: 10px; }
+th { text-align: left; color: var(--blue); }
+
+/* ===== Language Switch (bilingual) ===== */
+.en  { display: none; }
+.eni { display: none; }
+
+body.is-en .en  { display: block;  }
+body.is-en .eni { display: inline; }
+body.is-en .zh  { display: none;   }
+body.is-en .zhi { display: none;   }
+
+/* ===== Language Toggle Button ===== */
+.lang-switch {
+  position: fixed;
+  top: 14px;
+  right: 20px;
+  z-index: 100;
+}
+.lang-switch button {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  margin-left: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.lang-switch button.active {
+  border-color: var(--blue);
+  color: var(--blue);
+}

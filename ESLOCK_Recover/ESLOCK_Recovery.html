@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESLOCK Recovery — 說明文件</title>
+<style>
+  :root{--bg:#0d1117;--fg:#c9d1d9;--card:#161b22;--border:#30363d;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--code-bg:#1c2128;--table-alt:#1c2128}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft JhengHei","PingFang TC",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);line-height:1.8;padding:0}
+  .container{max-width:960px;margin:0 auto;padding:24px 32px 64px}
+  h1{font-size:2rem;margin:32px 0 8px;color:#fff;border-bottom:1px solid var(--border);padding-bottom:12px}
+  h2{font-size:1.45rem;margin:40px 0 12px;color:var(--accent);border-bottom:1px solid var(--border);padding-bottom:8px}
+  h3{font-size:1.15rem;margin:24px 0 8px;color:#fff}
+  p,li{margin:6px 0}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{background:var(--code-bg);padding:2px 6px;border-radius:4px;font-family:"Cascadia Code","Fira Code",Consolas,monospace;font-size:.9em}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:16px 20px;overflow-x:auto;font-size:.88em;line-height:1.55;margin:12px 0}
+  pre code{background:none;padding:0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.92em}
+  th,td{text-align:left;padding:10px 14px;border:1px solid var(--border)}
+  th{background:var(--card);color:#fff;font-weight:600}
+  tr:nth-child(even) td{background:var(--table-alt)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.8em;font-weight:600}
+  .badge-red{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+  .badge-yellow{background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.3)}
+  .badge-green{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+  .flow{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px 24px;overflow-x:auto;margin:16px 0}
+  .flow pre{background:none;border:none;padding:0;margin:0}
+  .toc{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px 24px;margin:20px 0}
+  .toc ul{list-style:none;padding-left:16px}
+  .toc>ul{padding-left:0}
+  .toc li{margin:4px 0}
+  .warn-box{background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.35);border-radius:8px;padding:16px 20px;margin:16px 0;color:var(--yellow)}
+  .footer-map td:first-child{white-space:nowrap;font-family:"Cascadia Code",Consolas,monospace;font-size:.85em}
+  blockquote{border-left:4px solid var(--accent);margin:16px 0;padding:8px 16px;background:rgba(88,166,255,.06);border-radius:0 8px 8px 0}
+  .version-bar{text-align:center;color:#8b949e;font-size:.85em;padding:12px 0;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="version-bar">ESLOCK Recovery &mdash; 版本 1.0 &nbsp;|&nbsp; &copy; 2025-2026 Rewolf &nbsp;|&nbsp; MIT 授權條款</div>
+
+<h1>ESLOCK Recovery</h1>
+<p>一個專用的命令列工具，用於在密碼遺失時復原 ES&nbsp;檔案瀏覽器（ES&nbsp;File&nbsp;Explorer）加密的 <code>.eslock</code> 檔案——利用嵌入在檔案尾部（Footer）中的加密金鑰直接解密。</p>
+
+<!-- 目錄 -->
+<div class="toc">
+  <strong>目錄</strong>
+  <ul>
+    <li><a href="#algorithm">ES 檔案瀏覽器加密演算法</a>
+      <ul>
+        <li><a href="#key-derivation">金鑰推導</a></li>
+        <li><a href="#encryption-flow">檔案加密流程</a></li>
+        <li><a href="#footer-structure">Footer 結構</a></li>
+      </ul>
+    </li>
+    <li><a href="#loophole">漏洞——為什麼能夠復原</a></li>
+    <li><a href="#recovery-flow">復原流程</a></li>
+    <li><a href="#requirements">環境需求</a></li>
+    <li><a href="#usage">使用方法</a></li>
+    <li><a href="#functions">函式參考</a></li>
+  </ul>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="algorithm">ES 檔案瀏覽器加密演算法</h2>
+<p>ES 檔案瀏覽器使用 <strong>AES-128-CFB</strong>（密碼回饋模式，128 位元區段）搭配一個<em>固定的</em>初始向量（IV）來加密檔案。加密後的輸出會以 <code>.eslock</code> 副檔名儲存為新檔案。</p>
+
+<h3 id="key-derivation">金鑰推導</h3>
+<div class="flow"><pre>
+密碼（UTF-8 字串）
+     │
+     ▼
+  MD5 雜湊（16 位元組）
+     │
+     ▼
+  AES-128 金鑰（MD5 摘要的前 16 位元組）
+</pre></div>
+<ul>
+  <li>使用者的密碼以 <strong>MD5</strong> 進行雜湊。</li>
+  <li>完整的 16 位元組摘要直接作為 AES 金鑰。</li>
+  <li>沒有鹽值（Salt）、沒有迭代次數、沒有金鑰延展（<strong>未使用</strong> PBKDF2 / scrypt / Argon2）。</li>
+</ul>
+
+<h3 id="encryption-flow">檔案加密流程</h3>
+<p>根據檔案大小使用兩種模式：</p>
+
+<h4>完整加密（小檔案）</h4>
+<div class="flow"><pre>
+┌─────────────────────────────────┐
+│           原始檔案                │
+│        （所有位元組）               │
+└────────────────┬────────────────┘
+                 │
+                 ▼
+   AES-128-CFB 串流加密
+   IV  = [0x00, 0x01, 0x02 … 0x0F]
+   Key = MD5(密碼)
+                 │
+                 ▼
+┌─────────────────────────────────┐
+│          加密後內容               │
+├─────────────────────────────────┤
+│            Footer               │
+│   （中繼資料 + 金鑰 + CRC）       │
+└─────────────────────────────────┘
+          輸出：file.eslock
+</pre></div>
+<p>所有位元組透過<strong>單一 AES-CFB 加密器實例</strong>處理（區塊之間不會重設加密器）。</p>
+
+<h4>部分加密（大檔案）</h4>
+<div class="flow"><pre>
+┌──────────────┬───────────────────────┬──────────────┐
+│   前段區塊    │        中段             │   後段區塊    │
+│（1024 位元組）│      （明文）            │（1024 位元組）│
+└──────┬───────┴───────────────────────┴──────┬───────┘
+       │                                      │
+       ▼                                      ▼
+  AES-CFB 加密                           AES-CFB 加密
+ （全新加密器）                           （全新加密器）
+       │                                      │
+       ▼                                      ▼
+┌──────────────┬───────────────────────┬──────────────┐
+│  加密後的     │  明文（直接透傳，       │  加密後的     │
+│  前段區塊     │  未經處理）             │  後段區塊     │
+├──────────────┴───────────────────────┴──────────────┤
+│                       Footer                         │
+└──────────────────────────────────────────────────────┘
+</pre></div>
+<ul>
+  <li>預設<strong>區塊大小 = 1024 位元組</strong>。</li>
+  <li>僅加密<strong>前端</strong>和<strong>後端</strong>各 1024 位元組的區塊。</li>
+  <li>檔案<strong>中段保持為明文</strong>。</li>
+  <li>每個區塊使用<strong>全新的加密器</strong>（相同金鑰 + 相同 IV）。</li>
+</ul>
+
+<h3 id="footer-structure">Footer 結構</h3>
+<p>Footer 附加在加密內容之後。檔案的最後 4 個位元組始終存放 footer 長度，作為解析的入口點。</p>
+
+<table class="footer-map">
+  <thead><tr><th>欄位</th><th>大小</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td>加密旗標</td><td>1 B</td><td><code>0xFF</code> = 完整加密；&ensp;其他 = 部分加密</td></tr>
+    <tr><td>區塊大小</td><td>4 B（大端序）</td><td>僅在部分加密時存在</td></tr>
+    <tr><td>檔名長度</td><td>1 B</td><td><code>0xFF</code> = 未儲存檔名</td></tr>
+    <tr><td>加密的檔名</td><td>可變長度</td><td>AES-CFB 加密，使用相同金鑰</td></tr>
+    <tr><td>金鑰前綴魔術位元組</td><td>1 B</td><td>固定為 <code>0x10</code></td></tr>
+    <tr><td style="color:var(--red);font-weight:700">★ AES 金鑰 ★</td><td>16 B</td><td style="color:var(--red)">解密金鑰，以<strong>明文</strong>儲存</td></tr>
+    <tr><td>金鑰後綴魔術位元組</td><td>1 B</td><td><code>0x00</code> 或 <code>0x02</code></td></tr>
+    <tr><td>CRC 填充</td><td>4 B</td><td>全為零</td></tr>
+    <tr><td>儲存的 CRC32</td><td>4 B（大端序）</td><td>CRC 區段之前的 footer 位元組之 CRC</td></tr>
+    <tr><td>Footer 長度</td><td>4 B（大端序）</td><td>包含此欄位在內的 footer 總長度</td></tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="loophole">漏洞——為什麼能夠復原</h2>
+
+<div class="warn-box">
+  <strong>AES 解密金鑰以明文形式儲存在加密檔案本身之中。</strong>
+</div>
+
+<blockquote>
+<code>.eslock</code> 格式更接近<strong>混淆</strong>而非加密。被「鎖定」的檔案攜帶著自己的鑰匙——就像一個上了鎖的箱子，卻把鑰匙貼在箱子外面。
+</blockquote>
+
+<table>
+  <thead><tr><th>弱點</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-red">嚴重</span>&ensp;金鑰儲存在檔案中</td>
+      <td>16 位元組的 AES 金鑰位於魔術位元組 <code>0x10</code> 和 <code>0x00</code>/<code>0x02</code> 之間。任何能讀取檔案的人都可以提取它。</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-red">嚴重</span>&ensp;不需要密碼</td>
+      <td>因為金鑰在 footer 中，使用者的密碼<strong>完全不需要</strong>即可解密。</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-yellow">高</span>&ensp;弱金鑰推導</td>
+      <td><code>MD5(密碼)</code> — 沒有鹽值、沒有迭代。即使金鑰沒有嵌入，密碼也能被輕易暴力破解。</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-yellow">高</span>&ensp;固定 IV</td>
+      <td><code>IV = [0, 1, 2, …, 15]</code> — 每個檔案、每個區塊都使用完全相同的 IV。破壞了 CFB 的語義安全性。</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-yellow">高</span>&ensp;部分加密洩漏資料</td>
+      <td>在部分加密模式下，檔案中段全部為明文。媒體檔案的內容大部分可直接檢視。</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-yellow">中</span>&ensp;僅有 CRC，無 MAC</td>
+      <td>CRC32 驗證的是結構完整性，<strong>而非</strong>檔案真實性。沒有 HMAC 或 AEAD。</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="recovery-flow">復原流程</h2>
+<div class="flow"><pre>
+                    ┌──────────────┐
+                    │  啟動 CLI    │
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │  掃描輸入路徑  │
+                    │  尋找 *.eslock│
+                    └──────┬───────┘
+                           │
+              ┌────────────▼────────────┐
+              │  對每個 .eslock 檔案     │
+              └────────────┬────────────┘
+                           │
+                ┌──────────▼──────────┐
+                │ 讀取最後 4 位元組    │
+                │ → footer_length     │
+                └──────────┬──────────┘
+                           │
+                   ┌───────▼────────┐  否
+                   │ 長度有效？      ├──────┐
+                   └───────┬────────┘      │
+                      是   │          ┌────▼────────────┐
+                           │          │ --heuristic?    │
+                           │          │ 掃描最後 128KB   │
+                           │          │ 尋找特徵碼       │
+                           │          └────┬────────────┘
+                           │               │
+                ┌──────────▼───────────────▼┐
+                │  解析 footer 結構          │
+                │  提取：金鑰、CRC、         │
+                │  加密模式、區塊大小、       │
+                │  加密檔名                  │
+                └──────────┬────────────────┘
+                           │
+                   ┌───────▼────────┐
+                   │  CRC 有效？    │
+                   └──┬──────────┬──┘
+                  是  │          │ 否
+                      │    ┌─────▼──────────┐
+                      │    │ --ignore-crc?  │
+                      │    └──┬──────────┬──┘
+                      │   是  │     否 → 跳過
+                      │       │
+                ┌─────▼───────▼──┐
+                │ 從 footer 提取  │
+                │ 16 位元組       │
+                │ AES 金鑰       │
+                └───────┬────────┘
+                        │
+              ┌─────────▼─────────┐
+              │ 解密原始檔名       │
+              │（如果有的話）       │
+              └─────────┬─────────┘
+                        │
+              ┌─────────▼─────────┐
+              │ 解密檔案內容：     │
+              │ 完整 → AES-CFB    │
+              │   整個串流         │
+              │ 部分 → 前段 +     │
+              │   後段區塊         │
+              └─────────┬─────────┘
+                        │
+              ┌─────────▼─────────┐
+              │ 寫入復原後的       │
+              │ 檔案至輸出目錄     │
+              └─────────┬─────────┘
+                        │
+                  ┌─────▼──┐
+                  │  完成   │
+                  └────────┘
+</pre></div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="requirements">環境需求</h2>
+<table>
+  <thead><tr><th>套件</th><th>版本</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Python</strong></td><td>≥ 3.8</td><td>執行環境</td></tr>
+    <tr><td><strong>pycryptodome</strong></td><td>≥ 3.9</td><td>AES-128-CFB 解密</td></tr>
+  </tbody>
+</table>
+<p>使用的標準函式庫模組：<code>argparse</code>、<code>hashlib</code>、<code>os</code>、<code>struct</code>、<code>sys</code>、<code>zlib</code>、<code>datetime</code>、<code>pathlib</code>、<code>typing</code>。</p>
+<pre><code>pip install pycryptodome</code></pre>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="usage">使用方法</h2>
+<pre><code># 復原目前目錄下所有 .eslock 檔案
+python ESLOCK_Recovery.py
+
+# 復原單一檔案
+python ESLOCK_Recovery.py photo.eslock
+
+# 將目錄復原至指定輸出資料夾
+python ESLOCK_Recovery.py ./encrypted ./recovered
+
+# 使用啟發式搜尋處理損壞的檔案
+python ESLOCK_Recovery.py --heuristic ./damaged
+
+# 忽略 CRC 不符強制復原
+python ESLOCK_Recovery.py --ignore-crc ./files
+
+# 覆寫已存在的輸出檔案
+python ESLOCK_Recovery.py --overwrite ./files ./output</code></pre>
+
+<table>
+  <thead><tr><th>參數</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td><code>input</code></td><td>要復原的檔案或目錄（預設：目前目錄）</td></tr>
+    <tr><td><code>output</code></td><td>目的地目錄（預設：自動建立 <code>recovered-YYYYMMDD-HHMMSS</code>）</td></tr>
+    <tr><td><code>--overwrite</code></td><td>覆寫已存在的輸出檔案</td></tr>
+    <tr><td><code>--ignore-crc</code></td><td>即使 footer CRC 檢查失敗仍繼續處理</td></tr>
+    <tr><td><code>--heuristic</code></td><td>使用啟發式 footer 搜尋（適用於損壞／截斷的檔案）</td></tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="functions">函式參考</h2>
+
+<h3>密碼學</h3>
+<table>
+  <thead><tr><th>函式</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td><code>_make_aes(key)</code></td><td>使用固定 IV <code>[0..15]</code> 建立 AES-128-CFB 加密器</td></tr>
+    <tr><td><code>decrypt_stream(…)</code></td><td>解密檔案本體——處理完整及部分加密模式</td></tr>
+    <tr><td><code>decrypt_file_name(…)</code></td><td>解密儲存在 footer 中的原始檔名（補齊至 16 位元組邊界）</td></tr>
+  </tbody>
+</table>
+
+<h3>Footer 解析</h3>
+<table>
+  <thead><tr><th>函式</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td><code>read_footer_standard(path)</code></td><td>快速讀取器——讀取最後 1024 位元組，從宣告的長度欄位解析</td></tr>
+    <tr><td><code>read_footer_heuristic(path)</code></td><td>容錯讀取器——掃描最後 128 KB 尋找特徵碼與結構模式</td></tr>
+    <tr><td><code>_seq_parse(buf, total, offset)</code></td><td>在指定的緩衝區偏移量嘗試解析 footer 結構（由啟發式掃描器使用）</td></tr>
+    <tr><td><code>_read_tail(path, length)</code></td><td>讀取檔案的最後 N 個位元組</td></tr>
+    <tr><td><code>_crc32(data)</code></td><td>計算無號 32 位元 CRC32</td></tr>
+  </tbody>
+</table>
+
+<h3>復原</h3>
+<table>
+  <thead><tr><th>函式</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td><code>_recover_one(…)</code></td><td>核心函式：讀取 footer → 提取金鑰 → 驗證 CRC → 解密 → 寫入輸出</td></tr>
+    <tr><td><code>main()</code></td><td>CLI 進入點：解析參數、收集檔案、執行復原、列印摘要</td></tr>
+  </tbody>
+</table>
+
+<h3>資料模型</h3>
+<table>
+  <thead><tr><th>類別</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td><code>EslockFooter</code></td><td>儲存所有已解析的 footer 欄位：<code>key</code>、<code>is_partial_encryption</code>、<code>encrypted_block_size</code>、<code>encrypted_original_name</code>、<code>stored_crc</code>、<code>calculated_crc</code>、<code>footer_offset</code>、<code>footer_length</code>。屬性 <code>is_crc_valid</code> 檢查 CRC 是否吻合。</td></tr>
+  </tbody>
+</table>
+
+</div>
+</body>
+</html>

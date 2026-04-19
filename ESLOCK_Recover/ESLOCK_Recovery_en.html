@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESLOCK Recovery — Documentation</title>
+<style>
+  :root{--bg:#0d1117;--fg:#c9d1d9;--card:#161b22;--border:#30363d;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--code-bg:#1c2128;--table-alt:#1c2128}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);line-height:1.7;padding:0}
+  .container{max-width:960px;margin:0 auto;padding:24px 32px 64px}
+  h1{font-size:2rem;margin:32px 0 8px;color:#fff;border-bottom:1px solid var(--border);padding-bottom:12px}
+  h2{font-size:1.45rem;margin:40px 0 12px;color:var(--accent);border-bottom:1px solid var(--border);padding-bottom:8px}
+  h3{font-size:1.15rem;margin:24px 0 8px;color:#fff}
+  p,li{margin:6px 0}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{background:var(--code-bg);padding:2px 6px;border-radius:4px;font-family:"Cascadia Code","Fira Code",Consolas,monospace;font-size:.9em}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:16px 20px;overflow-x:auto;font-size:.88em;line-height:1.55;margin:12px 0}
+  pre code{background:none;padding:0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.92em}
+  th,td{text-align:left;padding:10px 14px;border:1px solid var(--border)}
+  th{background:var(--card);color:#fff;font-weight:600}
+  tr:nth-child(even) td{background:var(--table-alt)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:.8em;font-weight:600}
+  .badge-red{background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3)}
+  .badge-yellow{background:rgba(210,153,34,.15);color:var(--yellow);border:1px solid rgba(210,153,34,.3)}
+  .badge-green{background:rgba(63,185,80,.15);color:var(--green);border:1px solid rgba(63,185,80,.3)}
+  .flow{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px 24px;overflow-x:auto;margin:16px 0}
+  .flow pre{background:none;border:none;padding:0;margin:0}
+  .toc{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px 24px;margin:20px 0}
+  .toc ul{list-style:none;padding-left:16px}
+  .toc>ul{padding-left:0}
+  .toc li{margin:4px 0}
+  .warn-box{background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.35);border-radius:8px;padding:16px 20px;margin:16px 0;color:var(--yellow)}
+  .footer-map td:first-child{white-space:nowrap;font-family:"Cascadia Code",Consolas,monospace;font-size:.85em}
+  blockquote{border-left:4px solid var(--accent);margin:16px 0;padding:8px 16px;background:rgba(88,166,255,.06);border-radius:0 8px 8px 0}
+  .version-bar{text-align:center;color:#8b949e;font-size:.85em;padding:12px 0;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="version-bar">ESLOCK Recovery &mdash; Version 1.0 &nbsp;|&nbsp; &copy; 2025-2026 Rewolf &nbsp;|&nbsp; MIT License</div>
+
+<h1>ESLOCK Recovery</h1>
+<p>A single-purpose CLI tool that recovers ES&nbsp;File&nbsp;Explorer encrypted files (<code>.eslock</code>) when the password is lost &mdash; by exploiting the encryption key embedded in the file footer.</p>
+
+<!-- TOC -->
+<div class="toc">
+  <strong>Table of Contents</strong>
+  <ul>
+    <li><a href="#algorithm">ES File Explorer Encryption Algorithm</a>
+      <ul>
+        <li><a href="#key-derivation">Key Derivation</a></li>
+        <li><a href="#encryption-flow">File Encryption Flow</a></li>
+        <li><a href="#footer-structure">Footer Structure</a></li>
+      </ul>
+    </li>
+    <li><a href="#loophole">The Loophole &mdash; Why Recovery Is Possible</a></li>
+    <li><a href="#recovery-flow">Recovery Flow</a></li>
+    <li><a href="#requirements">Requirements</a></li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#functions">Function Reference</a></li>
+  </ul>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="algorithm">ES File Explorer Encryption Algorithm</h2>
+<p>ES File Explorer uses <strong>AES-128-CFB</strong> (Cipher Feedback Mode, 128-bit segment) with a <em>fixed</em> initialisation vector to encrypt files. The encrypted output is saved as a new file with the <code>.eslock</code> extension.</p>
+
+<h3 id="key-derivation">Key Derivation</h3>
+<div class="flow"><pre>
+Password  (UTF-8 string)
+     │
+     ▼
+  MD5 hash  (16 bytes)
+     │
+     ▼
+  AES-128 key  (first 16 bytes of MD5 digest)
+</pre></div>
+<ul>
+  <li>The user password is hashed with <strong>MD5</strong>.</li>
+  <li>The full 16-byte digest is used directly as the AES key.</li>
+  <li>No salt, no iterations, no key stretching (PBKDF2 / scrypt / Argon2 is <strong>not</strong> used).</li>
+</ul>
+
+<h3 id="encryption-flow">File Encryption Flow</h3>
+<p>Two modes are used depending on file size:</p>
+
+<h4>Full Encryption (small files)</h4>
+<div class="flow"><pre>
+┌─────────────────────────────────┐
+│         Original File           │
+│       (all bytes)               │
+└────────────────┬────────────────┘
+                 │
+                 ▼
+   AES-128-CFB  encrypt  (stream)
+   IV  = [0x00, 0x01, 0x02 … 0x0F]
+   Key = MD5(password)
+                 │
+                 ▼
+┌─────────────────────────────────┐
+│       Encrypted Content         │
+├─────────────────────────────────┤
+│            Footer               │
+│   (metadata + KEY + CRC)        │
+└─────────────────────────────────┘
+           output: file.eslock
+</pre></div>
+<p>All bytes flow through a <strong>single AES-CFB cipher instance</strong> (no cipher reset between chunks).</p>
+
+<h4>Partial Encryption (large files)</h4>
+<div class="flow"><pre>
+┌──────────────┬───────────────────────┬──────────────┐
+│  First Block │     Middle Section    │  Last Block  │
+│  (1024 B)    │     (plaintext)       │  (1024 B)    │
+└──────┬───────┴───────────────────────┴──────┬───────┘
+       │                                      │
+       ▼                                      ▼
+  AES-CFB encrypt                        AES-CFB encrypt
+  (fresh cipher)                         (fresh cipher)
+       │                                      │
+       ▼                                      ▼
+┌──────────────┬───────────────────────┬──────────────┐
+│  Encrypted   │  Plaintext (pass-     │  Encrypted   │
+│  First Block │  through, untouched)  │  Last Block  │
+├──────────────┴───────────────────────┴──────────────┤
+│                       Footer                         │
+└──────────────────────────────────────────────────────┘
+</pre></div>
+<ul>
+  <li>Default <strong>block size = 1024 bytes</strong>.</li>
+  <li>Only the <strong>first</strong> and <strong>last</strong> 1024-byte blocks are encrypted.</li>
+  <li>The <strong>middle</strong> of the file remains <strong>plaintext</strong>.</li>
+  <li>Each block gets a <strong>fresh cipher</strong> (same key + same IV).</li>
+</ul>
+
+<h3 id="footer-structure">Footer Structure</h3>
+<p>The footer is appended after the encrypted content. The last 4 bytes of the file always hold the footer length, serving as the parsing entry point.</p>
+
+<table class="footer-map">
+  <thead><tr><th>Field</th><th>Size</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>Encryption flag</td><td>1 B</td><td><code>0xFF</code> = full encryption;&ensp;other = partial</td></tr>
+    <tr><td>Block size</td><td>4 B (BE)</td><td>Only present if partial encryption</td></tr>
+    <tr><td>Name length</td><td>1 B</td><td><code>0xFF</code> = name not stored</td></tr>
+    <tr><td>Encrypted filename</td><td>variable</td><td>AES-CFB encrypted, same key</td></tr>
+    <tr><td>Key prefix magic</td><td>1 B</td><td>Always <code>0x10</code></td></tr>
+    <tr><td style="color:var(--red);font-weight:700">★ AES KEY ★</td><td>16 B</td><td style="color:var(--red)">The decryption key, stored in <strong>plaintext</strong></td></tr>
+    <tr><td>Key postfix magic</td><td>1 B</td><td><code>0x00</code> or <code>0x02</code></td></tr>
+    <tr><td>CRC padding</td><td>4 B</td><td>All zeros</td></tr>
+    <tr><td>Stored CRC32</td><td>4 B (BE)</td><td>CRC of footer bytes before the CRC section</td></tr>
+    <tr><td>Footer length</td><td>4 B (BE)</td><td>Total footer size (including this field)</td></tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="loophole">The Loophole &mdash; Why Recovery Is Possible</h2>
+
+<div class="warn-box">
+  <strong>The AES decryption key is stored in plaintext inside the encrypted file itself.</strong>
+</div>
+
+<blockquote>
+The <code>.eslock</code> format is closer to <strong>obfuscation</strong> than encryption.
+The &ldquo;locked&rdquo; file carries its own key &mdash; like a padlocked box with the key taped to the outside.
+</blockquote>
+
+<table>
+  <thead><tr><th>Weakness</th><th>Detail</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-red">Critical</span>&ensp;Key stored in file</td>
+      <td>The 16-byte AES key sits between magic bytes <code>0x10</code> and <code>0x00</code>/<code>0x02</code>. Anyone who can read the file can extract it.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-red">Critical</span>&ensp;No password needed</td>
+      <td>Because the key is in the footer, the user's password is <strong>never required</strong> for decryption.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-yellow">High</span>&ensp;Weak key derivation</td>
+      <td><code>MD5(password)</code> — no salt, no iterations. Trivially brute-forceable even without the embedded key.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-yellow">High</span>&ensp;Fixed IV</td>
+      <td><code>IV = [0, 1, 2, …, 15]</code> — the same IV for every file, every block. Breaks CFB semantic security.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-yellow">High</span>&ensp;Partial encryption leaks data</td>
+      <td>In partial mode the entire middle of the file is plaintext. Media files are largely viewable.</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-yellow">Medium</span>&ensp;CRC only, no MAC</td>
+      <td>CRC32 verifies structure integrity, <strong>not</strong> file authenticity. No HMAC or AEAD.</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="recovery-flow">Recovery Flow</h2>
+<div class="flow"><pre>
+                    ┌──────────────┐
+                    │  Start CLI   │
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │ Scan input   │
+                    │ for *.eslock │
+                    └──────┬───────┘
+                           │
+              ┌────────────▼────────────┐
+              │  For each .eslock file  │
+              └────────────┬────────────┘
+                           │
+                ┌──────────▼──────────┐
+                │ Read last 4 bytes   │
+                │ → footer_length     │
+                └──────────┬──────────┘
+                           │
+                   ┌───────▼────────┐  No
+                   │ Valid length?  ├──────┐
+                   └───────┬────────┘      │
+                      Yes  │          ┌────▼────────────┐
+                           │          │ --heuristic?    │
+                           │          │ Scan last 128KB │
+                           │          │ for signatures  │
+                           │          └────┬────────────┘
+                           │               │
+                ┌──────────▼───────────────▼┐
+                │  Parse footer structure   │
+                │  Extract: key, CRC,       │
+                │  enc_mode, block_size,    │
+                │  encrypted filename       │
+                └──────────┬────────────────┘
+                           │
+                   ┌───────▼────────┐
+                   │  CRC valid?    │
+                   └──┬──────────┬──┘
+                  Yes │          │ No
+                      │    ┌─────▼──────────┐
+                      │    │ --ignore-crc?  │
+                      │    └──┬──────────┬──┘
+                      │   Yes │      No → SKIP
+                      │       │
+                ┌─────▼───────▼──┐
+                │ Extract 16-byte│
+                │ AES key from   │
+                │ footer         │
+                └───────┬────────┘
+                        │
+              ┌─────────▼─────────┐
+              │ Decrypt original  │
+              │ filename (if any) │
+              └─────────┬─────────┘
+                        │
+              ┌─────────▼─────────┐
+              │ Decrypt content:  │
+              │ Full → AES-CFB    │
+              │   entire stream   │
+              │ Partial → first + │
+              │   last blocks     │
+              └─────────┬─────────┘
+                        │
+              ┌─────────▼─────────┐
+              │ Write recovered   │
+              │ file to output    │
+              └─────────┬─────────┘
+                        │
+                  ┌─────▼──┐
+                  │  Done  │
+                  └────────┘
+</pre></div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="requirements">Requirements</h2>
+<table>
+  <thead><tr><th>Package</th><th>Version</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Python</strong></td><td>≥ 3.8</td><td>Runtime</td></tr>
+    <tr><td><strong>pycryptodome</strong></td><td>≥ 3.9</td><td>AES-128-CFB decryption</td></tr>
+  </tbody>
+</table>
+<p>Standard library modules: <code>argparse</code>, <code>hashlib</code>, <code>os</code>, <code>struct</code>, <code>sys</code>, <code>zlib</code>, <code>datetime</code>, <code>pathlib</code>, <code>typing</code>.</p>
+<pre><code>pip install pycryptodome</code></pre>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="usage">Usage</h2>
+<pre><code># Recover all .eslock files in the current directory
+python ESLOCK_Recovery.py
+
+# Recover a single file
+python ESLOCK_Recovery.py photo.eslock
+
+# Recover a directory to a specific output folder
+python ESLOCK_Recovery.py ./encrypted ./recovered
+
+# Handle corrupted files
+python ESLOCK_Recovery.py --heuristic ./damaged
+
+# Force recovery despite CRC mismatches
+python ESLOCK_Recovery.py --ignore-crc ./files
+
+# Overwrite existing output files
+python ESLOCK_Recovery.py --overwrite ./files ./output</code></pre>
+
+<table>
+  <thead><tr><th>Argument</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>input</code></td><td>File or directory to recover (default: current directory)</td></tr>
+    <tr><td><code>output</code></td><td>Destination directory (default: auto-created <code>recovered-YYYYMMDD-HHMMSS</code>)</td></tr>
+    <tr><td><code>--overwrite</code></td><td>Overwrite existing output files</td></tr>
+    <tr><td><code>--ignore-crc</code></td><td>Proceed even if footer CRC check fails</td></tr>
+    <tr><td><code>--heuristic</code></td><td>Use heuristic footer search (for corrupted/truncated files)</td></tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<h2 id="functions">Function Reference</h2>
+
+<h3>Cryptography</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>_make_aes(key)</code></td><td>Creates an AES-128-CFB cipher with fixed IV <code>[0..15]</code></td></tr>
+    <tr><td><code>decrypt_stream(…)</code></td><td>Decrypts file body — full or partial mode</td></tr>
+    <tr><td><code>decrypt_file_name(…)</code></td><td>Decrypts the original filename (padded to 16-byte boundary)</td></tr>
+  </tbody>
+</table>
+
+<h3>Footer Parsing</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>read_footer_standard(path)</code></td><td>Fast reader — reads last 1024 bytes, parses from declared length</td></tr>
+    <tr><td><code>read_footer_heuristic(path)</code></td><td>Resilient reader — scans last 128 KB for signatures &amp; structural patterns</td></tr>
+    <tr><td><code>_seq_parse(buf, total, offset)</code></td><td>Attempts footer parse at a given buffer offset (used by heuristic)</td></tr>
+    <tr><td><code>_read_tail(path, length)</code></td><td>Reads the last N bytes of a file</td></tr>
+    <tr><td><code>_crc32(data)</code></td><td>Computes unsigned 32-bit CRC32</td></tr>
+  </tbody>
+</table>
+
+<h3>Recovery</h3>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>_recover_one(…)</code></td><td>Core: read footer → extract key → validate CRC → decrypt → write output</td></tr>
+    <tr><td><code>main()</code></td><td>CLI entry point: parse args, collect files, run recovery, print summary</td></tr>
+  </tbody>
+</table>
+
+<h3>Data Model</h3>
+<table>
+  <thead><tr><th>Class</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>EslockFooter</code></td><td>Holds parsed footer fields: <code>key</code>, <code>is_partial_encryption</code>, <code>encrypted_block_size</code>, <code>encrypted_original_name</code>, <code>stored_crc</code>, <code>calculated_crc</code>, <code>footer_offset</code>, <code>footer_length</code>. Property <code>is_crc_valid</code> checks CRC match.</td></tr>
+  </tbody>
+</table>
+
+</div>
+</body>
+</html>
