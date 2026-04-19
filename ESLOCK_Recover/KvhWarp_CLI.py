@@ -17,11 +17,11 @@ import sys
 import time
 from pathlib import Path
 
-# ── Import from KvhWarp (same directory) ─────────────────────────────────────
+# ── Import from kvhwarp_core (same directory) ────────────────────────────────
 _HERE = Path(__file__).parent
 sys.path.insert(0, str(_HERE))
 
-from KvhWarp import (  # noqa: E402
+from kvhwarp_core import (  # noqa: E402
     KDF_SHA256,
     KDF_SCRYPT,
     ENCRYPT_SIZE,
@@ -35,6 +35,7 @@ from KvhWarp import (  # noqa: E402
     restore_subfolders,
     cleanup_empty_dirs,
     _range_resolve_bc,
+    _generate_hybrid_password,
     _APP_NAME,
     _APP_VERSION,
 )
@@ -91,13 +92,16 @@ def cmd_warp(args: argparse.Namespace) -> int:
     # Manual B/C pre-computed here; auto mode resolved per-file inside warp_fn
     r_b, r_c  = _range_resolve_bc(args.range_b, args.range_c, args.range_unit, 0)
 
+    enhance = args.enhance
+
     t0 = time.perf_counter()
     ok = err = 0
     for f in files:
         file_enc_size = f.stat().st_size if encrypt_all else enc_size
         file_use_tail = False if encrypt_all else use_tail
+        eff_pw = _generate_hybrid_password(pw, f) if enhance else pw
         result = warp_fn(
-            f, pw,
+            f, eff_pw,
             kdf=kdf,
             base_folder=folder,
             encrypt_size=file_enc_size,
@@ -137,11 +141,14 @@ def cmd_unwarp(args: argparse.Namespace) -> int:
         print("No .ks files found.")
         return 0
 
+    enhance = args.enhance
+
     print(f"Unwarp: {len(files)} .ks file(s) in {folder}")
     t0 = time.perf_counter()
     ok = err = 0
     for f in files:
-        result = unwarp_auto(f, pw, base_folder=folder)
+        eff_pw = _generate_hybrid_password(pw, f) if enhance else pw
+        result = unwarp_auto(f, eff_pw, base_folder=folder)
         print(f"  {result}")
         if result.startswith("OK"):
             ok += 1
@@ -164,7 +171,8 @@ def cmd_unwarp_file(args: argparse.Namespace) -> int:
         return 1
 
     pw = _get_password(args.password)
-    result = unwarp_auto(fp, pw)
+    eff_pw = _generate_hybrid_password(pw, fp) if args.enhance else pw
+    result = unwarp_auto(fp, eff_pw)
     print(result)
     return 0 if result.startswith("OK") else 1
 
@@ -224,18 +232,24 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Period N units (manual)")
     p_warp.add_argument("--range-unit", default="KB", choices=["B", "KB", "MB"],
                         help="Unit for --range-b/c (default: KB)")
+    p_warp.add_argument("--enhance", action="store_true",
+                        help="Mix password with per-file fingerprint (must match on decrypt)")
 
     # ── unwarp ────────────────────────────────────────────────────────────────
     p_unwarp = sub.add_parser("unwarp", help="Decrypt .ks files in a folder")
     p_unwarp.add_argument("folder", type=Path, help="Target folder")
     p_unwarp.add_argument("-p", "--password", default=None, metavar="PW",
                           help="Password (prompted if omitted)")
+    p_unwarp.add_argument("--enhance", action="store_true",
+                          help="Use password enhancement (must match the warp setting)")
 
     # ── unwarp-file ───────────────────────────────────────────────────────────
     p_file = sub.add_parser("unwarp-file", help="Decrypt a single .ks file")
     p_file.add_argument("file", type=Path, help="Path to .ks file")
     p_file.add_argument("-p", "--password", default=None, metavar="PW",
                         help="Password (prompted if omitted)")
+    p_file.add_argument("--enhance", action="store_true",
+                        help="Use password enhancement (must match the warp setting)")
 
     return parser
 
