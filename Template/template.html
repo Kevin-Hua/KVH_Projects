@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page Title</title>
+<link rel="stylesheet" href="template.css">
+</head>
+
+<body>
+
+<!-- ===== Language Toggle ===== -->
+<div class="lang-switch">
+  <button id="btn-zh" class="active" onclick="setLang('zh')">中文</button>
+  <button id="btn-en"                onclick="setLang('en')">English</button>
+</div>
+
+<div class="wrapper">
+
+  <!-- ===== Sidebar Navigation ===== -->
+  <nav>
+    <h3>📑 <span class="zhi">目錄</span><span class="eni">Contents</span></h3>
+    <a href="#section1"><span class="zhi">第一節</span><span class="eni">Section One</span></a>
+    <a href="#section2"><span class="zhi">第二節</span><span class="eni">Section Two</span></a>
+    <a href="#section3"><span class="zhi">第三節</span><span class="eni">Section Three</span></a>
+    <a href="#section-code"><span class="zhi">程式碼範例</span><span class="eni">Code Blocks</span></a>
+  </nav>
+
+  <!-- ===== Main Content ===== -->
+  <main>
+
+    <!-- Section 1 -->
+    <section id="section1">
+      <div class="icon-title">
+        📦 <span class="zhi">第一節標題</span><span class="eni">Section One Title</span>
+      </div>
+      <div class="divider"></div>
+      <div class="panel">
+        <div class="zh">
+          <p>這裡放中文內容。支援 <code>行內程式碼</code> 與段落。</p>
+        </div>
+        <div class="en">
+          <p>English content goes here. Supports <code>inline code</code> and paragraphs.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2 — List example -->
+    <section id="section2">
+      <div class="icon-title">
+        ⚙️ <span class="zhi">第二節標題</span><span class="eni">Section Two Title</span>
+      </div>
+      <div class="divider"></div>
+      <div class="panel">
+        <div class="zh">
+          <ul>
+            <li>項目一</li>
+            <li>項目二</li>
+            <li>項目三</li>
+          </ul>
+        </div>
+        <div class="en">
+          <ul>
+            <li>Item one</li>
+            <li>Item two</li>
+            <li>Item three</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3 — Table example -->
+    <section id="section3">
+      <div class="icon-title">
+        📊 <span class="zhi">第三節標題</span><span class="eni">Section Three Title</span>
+      </div>
+      <div class="divider"></div>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr>
+              <th><span class="zhi">欄位 A</span><span class="eni">Column A</span></th>
+              <th><span class="zhi">欄位 B</span><span class="eni">Column B</span></th>
+              <th><span class="zhi">備註</span><span class="eni">Notes</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Value 1</td>
+              <td>Value 2</td>
+              <td><span class="zhi">說明</span><span class="eni">Description</span></td>
+            </tr>
+            <tr>
+              <td>Value 3</td>
+              <td>Value 4</td>
+              <td><span class="zhi">說明</span><span class="eni">Description</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section: Code Blocks sample —— demonstrates all pre/code styles -->
+    <section id="section-code">
+      <div class="icon-title">
+        💻 <span class="zhi">程式碼區塊範例</span><span class="eni">Code Block Examples</span>
+      </div>
+      <div class="divider"></div>
+      <div class="panel">
+
+        <!-- ── Inline code ── -->
+        <div class="zh">
+          <p><b>行內程式碼</b>：使用 <code>&lt;code&gt;</code> 標籤，適合短片段。</p>
+          <p>例如：金鑰派生公式為 <code>Key = MD5(password)[:16]</code>，IV 固定為 <code class="hl">[0x00..0x0F]</code>。</p>
+        </div>
+        <div class="en">
+          <p><b>Inline code</b>: use the <code>&lt;code&gt;</code> tag for short snippets.</p>
+          <p>Example: key derivation is <code>Key = MD5(password)[:16]</code>, IV is fixed as <code class="hl">[0x00..0x0F]</code>.</p>
+        </div>
+
+        <!-- ── Block code: plain pre ── -->
+        <div class="zh"><p style="margin-top:24px"><b>多行程式碼區塊</b>（<code>&lt;pre&gt;</code>）：</p></div>
+        <div class="en"><p style="margin-top:24px"><b>Multi-line code block</b> (<code>&lt;pre&gt;</code>):</p></div>
+        <pre>User Password
+   ↓ PBKDF2-HMAC-SHA256 (600k iterations)
+Master Key
+   ↓ SHA256 + IV
+File Key
+   ↓
+AES-CFB Encryption + HMAC-SHA256</pre>
+
+        <!-- ── Block code: pre > code with token highlights ── -->
+        <div class="zh"><p style="margin-top:24px"><b>帶語法高亮的程式碼區塊</b>（<code>&lt;pre&gt;&lt;code&gt;</code> + span tokens）：</p></div>
+        <div class="en"><p style="margin-top:24px"><b>Syntax-highlighted block</b> (<code>&lt;pre&gt;&lt;code&gt;</code> + span tokens):</p></div>
+        <pre><code><span class="dim"># key derivation</span>
+key  = <span class="hl">MD5</span>(password)[:<span class="ok">16</span>]
+iv   = bytes([<span class="ok">0x00</span>] * <span class="ok">16</span>)
+
+<span class="dim"># encrypt</span>
+cipher = <span class="hl">AES</span>.new(key, AES.MODE_CFB, iv=iv, segment_size=<span class="ok">128</span>)
+out    = cipher.encrypt(plaintext)</code></pre>
+
+        <!-- ── Inline error / ok examples ── -->
+        <div class="zh">
+          <p style="margin-top:24px"><b>彩色狀態標記</b>：</p>
+          <pre><code><span class="ok">✔ AES-128-CFB  → supported</span>
+<span class="err">✘ AES-128-ECB  → not recommended</span>
+<span class="dim"># ECB 不提供語義安全性</span></code></pre>
+        </div>
+        <div class="en">
+          <p style="margin-top:24px"><b>Colour-coded status tokens</b>:</p>
+          <pre><code><span class="ok">✔ AES-128-CFB  → supported</span>
+<span class="err">✘ AES-128-ECB  → not recommended</span>
+<span class="dim"># ECB does not provide semantic security</span></code></pre>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div><!-- /.wrapper -->
+
+<script>
+/* ===== Language Switch =====
+   setLang('zh') / setLang('en')
+   body.is-en activates English mode (see template.css)
+   ======================================== */
+function setLang(code) {
+  var isEn = (code === 'en');
+  document.body.classList.toggle('is-en', isEn);
+  document.getElementById('btn-zh').classList.toggle('active', !isEn);
+  document.getElementById('btn-en').classList.toggle('active',  isEn);
+  try { localStorage.setItem('lang', code); } catch(e) {}
+}
+
+/* Auto-detect language on load */
+(function () {
+  var lang = 'zh';
+  try {
+    var saved = localStorage.getItem('lang');
+    if (saved === 'zh' || saved === 'en') {
+      lang = saved;
+    } else {
+      /* Use English for non-Chinese browser locales */
+      var bl = (navigator.language || 'zh').toLowerCase();
+      if (!bl.startsWith('zh')) lang = 'en';
+    }
+  } catch(e) {}
+  if (lang === 'en') setLang('en');
+})();
+
+/* ===== Active nav link on scroll ===== */
+var navLinks = document.querySelectorAll('nav a');
+var sections = document.querySelectorAll('section');
+window.addEventListener('scroll', function () {
+  var cur = '';
+  sections.forEach(function (s) {
+    if (window.scrollY >= s.offsetTop - 120) cur = s.id;
+  });
+  navLinks.forEach(function (a) {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + cur);
+  });
+});
+</script>
+
+</body>
+</html>
