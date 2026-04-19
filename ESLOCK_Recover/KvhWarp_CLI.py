@@ -35,6 +35,8 @@ from kvhwarp_core import (  # noqa: E402
     restore_subfolders,
     cleanup_empty_dirs,
     _range_resolve_bc,
+    _skip_exts_from_opts,
+    _DEFAULTS,
     _APP_NAME,
     _APP_VERSION,
 )
@@ -91,6 +93,10 @@ def cmd_warp(args: argparse.Namespace) -> int:
     # Manual B/C pre-computed here; auto mode resolved per-file inside warp_fn
     r_b, r_c  = _range_resolve_bc(args.range_b, args.range_c, args.range_unit, 0)
 
+    do_compress        = args.compress
+    compress_max_bytes = int(args.compress_max_mb * 1_048_576)
+    compress_skip_exts = _skip_exts_from_opts(_DEFAULTS)
+
     t0 = time.perf_counter()
     ok = err = 0
     for f in files:
@@ -111,6 +117,9 @@ def cmd_warp(args: argparse.Namespace) -> int:
             range_c_bytes=r_c,
             range_mode=r_mode,
             range_percent=r_percent,
+            compress=do_compress,
+            compress_max_bytes=compress_max_bytes,
+            compress_skip_exts=compress_skip_exts,
         )
         print(f"  {result}")
         if result.startswith("OK"):
@@ -224,6 +233,12 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="Period N units (manual)")
     p_warp.add_argument("--range-unit", default="KB", choices=["B", "KB", "MB"],
                         help="Unit for --range-b/c (default: KB)")
+
+    # Compression
+    p_warp.add_argument("--compress", action="store_true",
+                        help="Adaptive Zstd compression (entropy-gated, both copy and in-place)")
+    p_warp.add_argument("--compress-max-mb", type=float, default=500.0, metavar="MB",
+                        help="Skip compression for files larger than this (0 = unlimited, default: 500)")
 
     # ── unwarp ────────────────────────────────────────────────────────────────
     p_unwarp = sub.add_parser("unwarp", help="Decrypt .ks files in a folder")

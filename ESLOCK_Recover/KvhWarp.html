@@ -996,12 +996,12 @@ enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
     </table>
     <p style="margin-top:8px;color:var(--muted);font-size:.88rem">ℹ️ CLI 的 <code>--range-b / --range-c / --range-unit</code> 組合後轉換為 bytes。<code>--range-start / --range-end</code> 單位為 MB。</p>
 
-    <h3 style="color:var(--blue);margin:24px 0 14px">自適應壓縮（Copy 模式限定）</h3>
+    <h3 style="color:var(--blue);margin:24px 0 14px">自適應壓縮（Copy 和 In-place 模式均支援）</h3>
     <p>啟用後先以 Zstandard 壓縮原始檔，再執行加密；解密時自動還原。需安裝 <code>pip install zstandard</code>，否則靜默略過。</p>
     <table>
       <thead><tr><th>選項</th><th>預設</th><th>說明</th></tr></thead>
       <tbody>
-        <tr><td><code>compress_copy</code></td><td>False</td><td>Copy 模式啟用壓縮（GUI 設定）</td></tr>
+        <tr><td><code>compress_copy</code></td><td>False</td><td>啟用壓縮（GUI 設定，同時適用於 Copy 和 In-place）</td></tr>
         <tr><td><code>compress_max_mb</code></td><td>500</td><td>大小門檻（MB）；超過則不壓縮（0 = 無限制）</td></tr>
         <tr><td><code>compress_skip_exts</code></td><td>內建清單</td><td>不嘗試壓縮的副檔名（已壓縮格式：mp4、zip、jpg…）</td></tr>
       </tbody>
@@ -1052,12 +1052,12 @@ enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
     </table>
     <p style="margin-top:8px;color:var(--muted);font-size:.88rem">ℹ️ CLI flags <code>--range-b / --range-c / --range-unit</code> are multiplied to produce bytes. <code>--range-start / --range-end</code> inputs are in MB.</p>
 
-    <h3 style="color:var(--blue);margin:24px 0 14px">Adaptive Compression (Copy Mode Only)</h3>
-    <p>When enabled, the source file is compressed with Zstandard before encryption; decompression is applied automatically on unwarp. Requires <code>pip install zstandard</code> — silently skipped if unavailable.</p>
+    <h3 style="color:var(--blue);margin:24px 0 14px">Adaptive Compression (Copy and In-place Modes)</h3>
+    <p>When enabled, the source file is compressed with Zstandard before encryption; decompression is applied automatically on unwarp. Works in both copy and in-place modes. Requires <code>pip install zstandard</code> — silently skipped if unavailable.</p>
     <table>
       <thead><tr><th>Option</th><th>Default</th><th>Description</th></tr></thead>
       <tbody>
-        <tr><td><code>compress_copy</code></td><td>False</td><td>Enable compression in copy mode (GUI setting)</td></tr>
+        <tr><td><code>compress_copy</code></td><td>False</td><td>Enable compression (GUI setting; applies to both copy and in-place modes)</td></tr>
         <tr><td><code>compress_max_mb</code></td><td>500</td><td>Skip compression if file exceeds this MB (0 = unlimited)</td></tr>
         <tr><td><code>compress_skip_exts</code></td><td>built-in list</td><td>Extensions exempt from compression (already-compressed formats: mp4, zip, jpg…)</td></tr>
       </tbody>
@@ -1109,6 +1109,8 @@ enc_magic(4B)  ← KWRI XOR SHA256(pw)[0:4]</pre>
         <tr><td><code>--range-b N</code></td><td>Manual: 每週期加密 N 個 unit</td></tr>
         <tr><td><code>--range-c N</code></td><td>Manual: 週期 N 個 unit</td></tr>
         <tr><td><code>--range-unit {B,KB,MB}</code></td><td>B/C 單位</td></tr>
+        <tr><td><code>--compress</code></td><td>自適應 Zstd 壓縮（熱値門控，Copy 和 In-place 均支援）</td></tr>
+        <tr><td><code>--compress-max-mb MB</code></td><td>超過此 MB 則略過壓縮（0=無限制，預設 500）</td></tr>
       </tbody>
     </table>
   </div>
@@ -1142,6 +1144,8 @@ Commands:
         <tr><td><code>--range-b N</code></td><td>Manual: encrypt N units per period</td></tr>
         <tr><td><code>--range-c N</code></td><td>Manual: period is N units</td></tr>
         <tr><td><code>--range-unit {B,KB,MB}</code></td><td>Unit for B/C values</td></tr>
+        <tr><td><code>--compress</code></td><td>Adaptive Zstd compression (entropy-gated; works in both copy and in-place modes)</td></tr>
+        <tr><td><code>--compress-max-mb MB</code></td><td>Skip compression for files larger than this MB (0 = unlimited, default: 500)</td></tr>
       </tbody>
     </table>
   </div>

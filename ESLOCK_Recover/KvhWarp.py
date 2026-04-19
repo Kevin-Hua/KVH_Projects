@@ -579,11 +579,11 @@ class App(tk.Tk):
         self._chk_inplace = tk.Checkbutton(row_kdf, text="In-place (fast, no copy)", variable=self._var_inplace, font=("Segoe UI", 9), bg=BG, fg=FG, activebackground=BG, activeforeground=CYAN, selectcolor=BG_PANEL, command=self._on_inplace_toggle)
         self._chk_inplace.pack(side=tk.LEFT)
 
-        # ── Adaptive compress row (copy mode only) ──
+        # ── Adaptive compress row ──
         row_compress = tk.Frame(outer, bg=BG)
         row_compress.pack(fill=tk.X, pady=(0, 8))
         self._chk_compress = tk.Checkbutton(
-            row_compress, text="Adaptive Compress (Zstd, entropy-based, copy mode only)",
+            row_compress, text="Adaptive Compress (Zstd, entropy-based)",
             variable=self._var_compress,
             font=("Segoe UI", 9), bg=BG, fg=FG,
             activebackground=BG, activeforeground=CYAN,
@@ -804,17 +804,13 @@ class App(tk.Tk):
             _save_opts(self.opts)
 
     def _on_inplace_toggle(self):
-        """Gray out compress options when in-place mode is selected."""
-        inplace = self._var_inplace.get()
-        compress_state = tk.DISABLED if inplace else tk.NORMAL
-        self._chk_compress.configure(state=compress_state)
-        # Also update sub-row based on both inplace and compress checkbox
+        """Update compress options when mode changes."""
+        # Compress works in both modes now; just sync the sub-row state
         self._on_compress_toggle()
 
     def _on_compress_toggle(self):
         """Show/hide the size-limit sub-row; save option."""
-        inplace = self._var_inplace.get()
-        compress_on = self._var_compress.get() and not inplace
+        compress_on = self._var_compress.get()
         limit_state = tk.NORMAL if compress_on else tk.DISABLED
         self._spn_compress_mb.configure(state=limit_state)
         self.opts["compress_copy"] = self._var_compress.get()
@@ -923,8 +919,8 @@ class App(tk.Tk):
         # Manual B/C resolved here; auto mode is resolved per-file inside warp_fn
         r_b, r_c        = _range_resolve_bc(r_b_val, r_c_val, r_unit, 0)
 
-        # Compress options (copy mode only)
-        do_compress       = self._var_compress.get() and not use_inplace
+        # Compress options
+        do_compress       = self._var_compress.get()
         compress_max_bytes = self._var_compress_mb.get() * 1_048_576
         if do_compress:
             self.opts["compress_copy"]   = True
@@ -953,6 +949,9 @@ class App(tk.Tk):
                             range_c_bytes=r_c,
                             range_mode=r_mode,
                             range_percent=r_percent,
+                            compress=do_compress,
+                            compress_max_bytes=compress_max_bytes,
+                            compress_skip_exts=self._compress_skip_exts,
                         )
                     else:
                         result = warp_fn(

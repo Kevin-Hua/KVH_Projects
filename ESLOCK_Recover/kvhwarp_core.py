@@ -965,6 +965,9 @@ def warp_file_inplace(
     range_c_bytes: int = 64,
     range_mode: str = "manual",
     range_percent: int = 25,
+    compress: bool = False,
+    compress_max_bytes: int = 0,
+    compress_skip_exts: Optional[frozenset] = None,
 ) -> str:
     """Encrypt file in-place using v2 footer format.
 
@@ -990,21 +993,36 @@ def warp_file_inplace(
         orig_size        = file_size
         orig_mtime       = os.path.getmtime(filepath)
         orig_atime       = os.path.getatime(filepath)
-        actual_head_size = min(encrypt_size, orig_size)
+
+        # ── Optional pre-compression ──
+        compress_algo: Optional[str] = None
+        if compress:
+            _compress_tmp, compress_algo = _compress_auto(
+                filepath, compress_max_bytes, compress_skip_exts
+            )
+            if _compress_tmp is not None:
+                # Atomically overwrite the original with the compressed version.
+                # If this move succeeds, orig_size already captured the
+                # uncompressed size above, so decompression can verify it.
+                shutil.move(str(_compress_tmp), str(filepath))
+                file_size     = filepath.stat().st_size
+                file_size_mb  = file_size / (1024 * 1024)
+
+        actual_head_size = min(encrypt_size, file_size)
 
         # ── Key derivation ──
         salt = os.urandom(_SALT_SIZE)
         salt = bytes([salt[0] & 0xFE | (kdf & 0x01)]) + salt[1:]
         key  = _derive_key(password, kdf, salt)
 
-        # ── CTR region parameters ──
-        do_encrypt_tail = encrypt_tail and (orig_size >= 2 * encrypt_size)
-        m_start, m_size = _middle_region(orig_size, actual_head_size,
+        # ── CTR region parameters (operate on the compressed file_size) ──
+        do_encrypt_tail = encrypt_tail and (file_size >= 2 * encrypt_size)
+        m_start, m_size = _middle_region(file_size, actual_head_size,
                                          do_encrypt_tail, encrypt_middle_size)
         middle_nonce = os.urandom(8) if (encrypt_middle and m_size > 0) else None
 
         r_start = max(0, range_start)
-        r_end   = min(range_end if range_end > 0 else orig_size, orig_size)
+        r_end   = min(range_end if range_end > 0 else file_size, file_size)
         do_encrypt_range = encrypt_range and r_end > r_start
         if do_encrypt_range and range_mode == "auto":
             range_b_bytes, range_c_bytes = _range_auto_bc(range_percent, r_end - r_start)
@@ -1069,7 +1087,7 @@ def warp_file_inplace(
         do_enc_middle = encrypt_middle and m_size > 0
         metadata = {
             "orig_name":      filepath.name,
-            "orig_size":      orig_size,
+            "orig_size":      file_size,       # compressed size (= uncompressed when compress=False)
             "encrypt_size":   actual_head_size,
             "encrypt_tail":   do_encrypt_tail,
             "tail_nonce":     tail_nonce_hex,
@@ -1084,6 +1102,8 @@ def warp_file_inplace(
             "range_b_bytes":  range_b_bytes,
             "range_c_bytes":  range_c_bytes,
             "range_nonce":    range_nonce.hex() if range_nonce else None,
+            "compress_algo":  compress_algo,   # "zstd:{level}" or None
+            "compress_size":  orig_size,       # original uncompressed size for verification
         }
         enc_meta = _encrypt_meta(key, metadata)
 
@@ -1106,7 +1126,9 @@ def warp_file_inplace(
         os.utime(new_path, (orig_atime, orig_mtime))
 
         elapsed = _time.perf_counter() - start_time
-        return f"OK: {filepath.name} -> {new_path.name} ({file_size_mb:.1f}MB, {elapsed:.2f}s, in-place)"
+        orig_mb = orig_size / (1024 * 1024)
+        compress_tag = f", compressed" if compress_algo else ""
+        return f"OK: {filepath.name} -> {new_path.name} ({orig_mb:.1f}MB{compress_tag}, {elapsed:.2f}s, in-place)"
 
     except PermissionError:
         return f"ERR: {filepath.name} - Permission denied"
@@ -1642,6 +1664,12 @@ def _unwarp_inplace(filepath: Path, password: str) -> str:
         orig_stat = filepath.stat()
         filepath.rename(output_path)
         os.utime(output_path, (orig_stat.st_atime, orig_stat.st_mtime))
+
+        # ── Decompress if file was compressed at warp time ──
+        compress_algo = metadata.get("compress_algo")
+        if compress_algo:
+            compress_size = metadata.get("compress_size", orig_size)
+            _decompress_inplace(output_path, compress_algo, compress_size)
 
         elapsed      = _time.perf_counter() - start_time
         file_size_mb = orig_size / (1024 * 1024)
