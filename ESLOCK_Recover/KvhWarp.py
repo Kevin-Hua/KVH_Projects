@@ -105,6 +105,20 @@ _DEFAULTS: dict = {
     "range_b":         1,
     "range_c":         4,
     "range_unit":      "KB",
+    # Adaptive compression defaults (copy mode only)
+    "compress_copy":       False,
+    "compress_max_mb":     500,
+    "compress_skip_exts": [
+        ".7z", ".aac", ".apk", ".avi", ".avif", ".bmp", ".br",
+        ".dmg", ".docx", ".epub", ".flac", ".flv", ".gif",
+        ".gz", ".heic", ".heif", ".hevc", ".img", ".ipa",
+        ".iso", ".jar", ".jpg", ".jpeg", ".lz", ".lz4", ".lzma",
+        ".m4a", ".m4v", ".mkv", ".mov", ".mp3", ".mp4",
+        ".odt", ".ods", ".odp", ".ogg", ".opus",
+        ".png", ".pptx", ".rar",
+        ".vmdk", ".webm", ".webp", ".wmv", ".wma",
+        ".xlsx", ".xz", ".zip", ".zst", ".zz",
+    ],
 }
 
 MIN_FILE_SIZE = 1024
@@ -554,6 +568,194 @@ MAGIC_INPLACE = _MAGIC_INPLACE
 _SALT_SIZE          = 16          # KDF salt size in bytes
 ENCRYPT_MIDDLE_SIZE = 1_048_576   # Default center-anchored middle CTR region (1 MB)
 
+# ── Adaptive compression (copy mode only) ────────────────────────────────────
+
+# Hardcoded fallback — used only if opts key is absent or JSON is missing.
+_SKIP_COMPRESS_EXTS_DEFAULT: frozenset = frozenset([
+    ".7z", ".aac", ".apk", ".avi", ".avif", ".bmp", ".br",
+    ".dmg", ".docx", ".epub", ".flac", ".flv", ".gif",
+    ".gz", ".heic", ".heif", ".hevc", ".img", ".ipa",
+    ".iso", ".jar", ".jpg", ".jpeg", ".lz", ".lz4", ".lzma",
+    ".m4a", ".m4v", ".mkv", ".mov", ".mp3", ".mp4",
+    ".odt", ".ods", ".odp", ".ogg", ".opus",
+    ".png", ".pptx", ".rar",
+    ".vmdk", ".webm", ".webp", ".wmv", ".wma",
+    ".xlsx", ".xz", ".zip", ".zst", ".zz",
+])
+
+
+def _skip_exts_from_opts(opts: dict) -> frozenset:
+    """Build a normalised frozenset of skip-extensions from opts.
+    Each entry is lowercased and guaranteed to start with '.'.
+    Falls back to _SKIP_COMPRESS_EXTS_DEFAULT if key absent."""
+    raw = opts.get("compress_skip_exts")
+    if not raw:
+        return _SKIP_COMPRESS_EXTS_DEFAULT
+    result = set()
+    for e in raw:
+        e = e.strip().lower()
+        if not e:
+            continue
+        if not e.startswith("."):
+            e = "." + e
+        result.add(e)
+    return frozenset(result) if result else _SKIP_COMPRESS_EXTS_DEFAULT
+
+
+def _shannon_entropy(data: bytes) -> float:
+    """Return Shannon entropy of *data* in bits per byte (range 0–8)."""
+    if not data:
+        return 0.0
+    from math import log2
+    n = len(data)
+    freq = [0] * 256
+    for b in data:
+        freq[b] += 1
+    return -sum((c / n) * log2(c / n) for c in freq if c)
+
+
+def _sample_entropy(filepath: Path) -> float:
+    """Read up to 3 KB (head + middle + tail) and return Shannon entropy."""
+    file_size = filepath.stat().st_size
+    with open(filepath, "rb") as f:
+        if file_size <= 3072:
+            data = f.read()
+        else:
+            f.seek(0)
+            head = f.read(1024)
+            f.seek(file_size // 2 - 512)
+            mid = f.read(1024)
+            f.seek(file_size - 1024)
+            tail = f.read(1024)
+            data = head + mid + tail
+    return _shannon_entropy(data)
+
+
+def _zstd_level_for_entropy(entropy: float) -> Optional[int]:
+    """Map Shannon entropy to a Zstandard compression level, or None to skip.
+
+    entropy < 5.5          → level 10  (highly compressible)
+    5.5 ≤ entropy ≤ 6.8   → level 9..3 (linear interpolation)
+    entropy > 6.8          → None (skip — already dense / pre-compressed)
+    """
+    if entropy < 5.5:
+        return 10
+    if entropy <= 6.8:
+        level = round(9 - (entropy - 5.5) / 1.3 * 6)
+        return max(3, min(9, level))
+    return None
+
+
+def _compress_auto(
+    src: Path,
+    size_limit: int = 0,
+    skip_exts: Optional[frozenset] = None,
+) -> Tuple[Optional[Path], Optional[str]]:
+    """Try to compress *src* with Zstandard; return (temp_path, algo_tag) or (None, None).
+
+    Three ordered gates — any failure returns (None, None) immediately:
+    1. Extension gate  : suffix in skip_exts (or default list)
+    2. Size gate       : file larger than size_limit (0 = unlimited)
+    3. Entropy gate    : sample entropy too high for worthwhile compression
+    4. Savings guard   : compressed size must be < orig * 0.95
+
+    Requires: pip install zstandard
+    """
+    import tempfile
+
+    # Gate 1 — extension
+    exts = skip_exts if skip_exts is not None else _SKIP_COMPRESS_EXTS_DEFAULT
+    if src.suffix.lower() in exts:
+        return None, None
+
+    # Gate 2 — size limit
+    orig_size = src.stat().st_size
+    if size_limit > 0 and orig_size > size_limit:
+        return None, None
+
+    # Gate 3 — entropy
+    try:
+        entropy = _sample_entropy(src)
+    except Exception:
+        return None, None
+    level = _zstd_level_for_entropy(entropy)
+    if level is None:
+        return None, None
+
+    # Compress to a temp file
+    try:
+        import zstandard as zstd
+    except ImportError:
+        return None, None
+
+    tmp_dir = Path(tempfile.gettempdir()) / "KvhWarp"
+    tmp_dir.mkdir(exist_ok=True)
+    tmp_path = tmp_dir / f"{time.time_ns()}.zst"
+    try:
+        cctx = zstd.ZstdCompressor(level=level)
+        with open(src, "rb") as fin, open(tmp_path, "wb") as fout:
+            with cctx.stream_writer(fout, closefd=False) as writer:
+                while True:
+                    chunk = fin.read(COPY_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    writer.write(chunk)
+        comp_size = tmp_path.stat().st_size
+    except Exception:
+        try:
+            tmp_path.unlink()
+        except Exception:
+            pass
+        return None, None
+
+    # Gate 4 — savings guard (must save ≥5%)
+    if comp_size >= orig_size * 0.95:
+        try:
+            tmp_path.unlink()
+        except Exception:
+            pass
+        return None, None
+
+    return tmp_path, f"zstd:{level}"
+
+
+def _decompress_inplace(path: Path, algo: str, expected_size: int) -> None:
+    """Decompress *path* (written by _compress_auto) back to its original content.
+
+    Decompresses to a sibling *.dec_tmp* file, verifies byte count, then
+    atomically replaces *path*.
+    """
+    if not algo.startswith("zstd:"):
+        raise ValueError(f"Unknown compress_algo: {algo!r}")
+    try:
+        import zstandard as zstd
+    except ImportError:
+        raise RuntimeError("zstandard package required to decrypt this file — pip install zstandard")
+
+    tmp_path = path.parent / (path.name + ".dec_tmp")
+    try:
+        dctx = zstd.ZstdDecompressor()
+        written = 0
+        with open(path, "rb") as fin, open(tmp_path, "wb") as fout:
+            with dctx.stream_reader(fin) as reader:
+                while True:
+                    chunk = reader.read(COPY_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    fout.write(chunk)
+                    written += len(chunk)
+        if written != expected_size:
+            raise ValueError(
+                f"Decompressed size mismatch: expected {expected_size}, got {written}"
+            )
+        tmp_path.replace(path)
+    except Exception:
+        try:
+            tmp_path.unlink()
+        except Exception:
+            pass
+        raise
+
 # v2 File Format — Copy mode (.ks):
 #   enc_magic(4) | enc_salt_off(1) | salt_prefix(0-14B) | enc_meta_off(1) |
 #   enc_meta_prefix(var) | salt_suffix(var) | meta_enc_len(4) | enc_meta_suffix(var) |
@@ -635,6 +837,9 @@ def warp_file(
     range_c_bytes: int = 64,
     range_mode: str = "manual",
     range_percent: int = 25,
+    compress: bool = False,
+    compress_max_bytes: int = 0,
+    compress_skip_exts: Optional[frozenset] = None,
 ) -> str:
     """Encrypt file to a .ks copy using v2 obfuscated format.
 
@@ -645,6 +850,8 @@ def warp_file(
     """
     import time as _time
     start_time = _time.perf_counter()
+    _compress_tmp: Optional[Path] = None
+    compress_algo: Optional[str]  = None
     try:
         if is_warped(filepath, password):
             return f"SKIP: {filepath.name} (already warped)"
@@ -659,41 +866,52 @@ def warp_file(
         orig_mtime   = os.path.getmtime(filepath)
         orig_atime   = os.path.getatime(filepath)
 
+        # ── Adaptive compression (copy mode) ──
+        src_path = filepath
+        src_size = file_size
+        if compress:
+            _compress_tmp, compress_algo = _compress_auto(
+                filepath, compress_max_bytes, compress_skip_exts
+            )
+            if _compress_tmp is not None:
+                src_path = _compress_tmp
+                src_size = _compress_tmp.stat().st_size
+
         # ── Key derivation (salt generated here; kdf encoded in salt[0] LSB) ──
         salt = os.urandom(_SALT_SIZE)
         salt = bytes([salt[0] & 0xFE | (kdf & 0x01)]) + salt[1:]
         key  = _derive_key(password, kdf, salt)
 
         # ── Encrypt head (GCM blob: nonce+tag+ct) ──
-        actual_head_size = min(encrypt_size, file_size)
-        with open(filepath, "rb") as f:
+        actual_head_size = min(encrypt_size, src_size)
+        with open(src_path, "rb") as f:
             head_data = f.read(actual_head_size)
         encrypted_head = _encrypt_blob(key, head_data)
 
         # ── Encrypt tail ──
-        do_encrypt_tail = encrypt_tail and (file_size >= 2 * encrypt_size)
+        do_encrypt_tail = encrypt_tail and (src_size >= 2 * encrypt_size)
         encrypted_tail  = None
         if do_encrypt_tail:
-            with open(filepath, "rb") as f:
-                f.seek(file_size - encrypt_size)
+            with open(src_path, "rb") as f:
+                f.seek(src_size - encrypt_size)
                 tail_data = f.read(encrypt_size)
             encrypted_tail = _encrypt_blob(key, tail_data)
 
         # ── Middle CTR (center-anchored) ──
-        m_start, m_size = _middle_region(file_size, actual_head_size,
+        m_start, m_size = _middle_region(src_size, actual_head_size,
                                          do_encrypt_tail, encrypt_middle_size)
         middle_nonce = None
         middle_ct    = None
         if encrypt_middle and m_size > 0:
             middle_nonce = os.urandom(8)
-            with open(filepath, "rb") as f:
+            with open(src_path, "rb") as f:
                 f.seek(m_start)
                 middle_plain = f.read(m_size)
             middle_ct = _apply_ctr(b"\x02", middle_nonce, middle_plain, key)
 
         # ── Range CTR ──
         r_start = max(0, range_start)
-        r_end   = min(range_end if range_end > 0 else file_size, file_size)
+        r_end   = min(range_end if range_end > 0 else src_size, src_size)
         do_encrypt_range = encrypt_range and r_end > r_start
         if do_encrypt_range and range_mode == "auto":
             range_b_bytes, range_c_bytes = _range_auto_bc(range_percent, r_end - r_start)
@@ -720,6 +938,8 @@ def warp_file(
             "range_b_bytes":  range_b_bytes,
             "range_c_bytes":  range_c_bytes,
             "range_nonce":    range_nonce.hex() if range_nonce else None,
+            "compress_algo":  compress_algo,
+            "compress_size":  src_size,
         }
         enc_meta = _encrypt_meta(key, metadata)
 
@@ -747,9 +967,9 @@ def warp_file(
             dest_file.write(encrypted_head)
 
             # Stream middle gap with optional CTR transforms
-            middle_gap = file_size - actual_head_size - (encrypt_size if do_encrypt_tail else 0)
+            middle_gap = src_size - actual_head_size - (encrypt_size if do_encrypt_tail else 0)
             if middle_gap > 0:
-                with open(filepath, "rb") as src:
+                with open(src_path, "rb") as src:
                     src.seek(actual_head_size)
                     remaining = middle_gap
                     abs_pos   = actual_head_size
@@ -785,7 +1005,8 @@ def warp_file(
 
         os.utime(output_path, (orig_atime, orig_mtime))
         elapsed = _time.perf_counter() - start_time
-        return f"OK: {filepath.name} -> {output_path.name} ({file_size_mb:.1f}MB, {elapsed:.2f}s)"
+        compress_note = f", zstd:{compress_algo.split(':')[1]}" if compress_algo else ""
+        return f"OK: {filepath.name} -> {output_path.name} ({file_size_mb:.1f}MB{compress_note}, {elapsed:.2f}s)"
 
     except PermissionError:
         return f"ERR: {filepath.name} - Permission denied"
@@ -793,6 +1014,12 @@ def warp_file(
         return f"ERR: {filepath.name} - File system error"
     except Exception:
         return f"ERR: {filepath.name} - Encryption failed"
+    finally:
+        if _compress_tmp is not None:
+            try:
+                _compress_tmp.unlink()
+            except Exception:
+                pass
 
 
 def warp_file_inplace(
@@ -1213,9 +1440,11 @@ def _unwarp_copy(filepath: Path, password: str) -> str:
             metadata = _decrypt_meta(key, enc_meta)
 
             # ── Read encrypted head blob ──
-            enc_size  = metadata.get("encrypt_size", ENCRYPT_SIZE)
-            orig_size = metadata["orig_size"]
-            head_blob = f.read(12 + 16 + min(enc_size, orig_size))
+            enc_size      = metadata.get("encrypt_size", ENCRYPT_SIZE)
+            orig_size     = metadata["orig_size"]
+            compress_algo = metadata.get("compress_algo")
+            compress_size = metadata.get("compress_size", orig_size)
+            head_blob = f.read(12 + 16 + min(enc_size, compress_size))
             data_after_head = f.tell()
 
             # ── Read encrypted tail blob (last enc_size+28 bytes before eof) ──
@@ -1284,7 +1513,7 @@ def _unwarp_copy(filepath: Path, password: str) -> str:
         with open(output_path, "wb") as dest:
             dest.write(decrypted_head)
 
-            middle_gap = orig_size - enc_size - (enc_size if do_encrypt_tail else 0)
+            middle_gap = compress_size - enc_size - (enc_size if do_encrypt_tail else 0)
             if middle_gap > 0:
                 with open(filepath, "rb") as src:
                     src.seek(data_after_head)
@@ -1323,6 +1552,10 @@ def _unwarp_copy(filepath: Path, password: str) -> str:
         orig_stat = filepath.stat()
         os.utime(output_path, (orig_stat.st_atime, orig_stat.st_mtime))
         filepath.unlink()
+
+        # ── Decompress if the payload was compressed before encryption ──
+        if compress_algo:
+            _decompress_inplace(output_path, compress_algo, orig_size)
 
         elapsed      = _time.perf_counter() - start_time
         file_size_mb = orig_size / (1024 * 1024)
@@ -2050,6 +2283,10 @@ if __name__ == "__main__":
             self._var_range_b    = tk.IntVar(value=self.opts.get("range_b", 1))
             self._var_range_c    = tk.IntVar(value=self.opts.get("range_c", 4))
             self._var_range_unit = tk.StringVar(value=self.opts.get("range_unit", "KB"))
+            # Adaptive compression vars (copy mode only)
+            self._var_compress    = tk.BooleanVar(value=self.opts.get("compress_copy", False))
+            self._var_compress_mb = tk.IntVar(value=self.opts.get("compress_max_mb", 500))
+            self._compress_skip_exts = _skip_exts_from_opts(self.opts)
 
             self._build_menu()
             self._build_ui()
@@ -2082,7 +2319,37 @@ if __name__ == "__main__":
             row_kdf = tk.Frame(outer, bg=BG)
             row_kdf.pack(fill=tk.X, pady=(0, 12))
             tk.Checkbutton(row_kdf, text="Use scrypt (strong KDF, ~130 ms)", variable=self._var_scrypt, font=("Segoe UI", 9), bg=BG, fg=FG, activebackground=BG, activeforeground=CYAN, selectcolor=BG_PANEL).pack(side=tk.LEFT, padx=(0, 16))
-            tk.Checkbutton(row_kdf, text="In-place (fast, no copy)", variable=self._var_inplace, font=("Segoe UI", 9), bg=BG, fg=FG, activebackground=BG, activeforeground=CYAN, selectcolor=BG_PANEL).pack(side=tk.LEFT)
+            self._chk_inplace = tk.Checkbutton(row_kdf, text="In-place (fast, no copy)", variable=self._var_inplace, font=("Segoe UI", 9), bg=BG, fg=FG, activebackground=BG, activeforeground=CYAN, selectcolor=BG_PANEL, command=self._on_inplace_toggle)
+            self._chk_inplace.pack(side=tk.LEFT)
+
+            # ── Adaptive compress row (copy mode only) ──
+            row_compress = tk.Frame(outer, bg=BG)
+            row_compress.pack(fill=tk.X, pady=(0, 8))
+            self._chk_compress = tk.Checkbutton(
+                row_compress, text="Adaptive Compress (Zstd, entropy-based, copy mode only)",
+                variable=self._var_compress,
+                font=("Segoe UI", 9), bg=BG, fg=FG,
+                activebackground=BG, activeforeground=CYAN,
+                selectcolor=BG_PANEL,
+                command=self._on_compress_toggle,
+            )
+            self._chk_compress.pack(side=tk.LEFT)
+            self._frm_compress_limit = tk.Frame(row_compress, bg=BG)
+            self._frm_compress_limit.pack(side=tk.LEFT, padx=(10, 0))
+            tk.Label(self._frm_compress_limit, text="Max:", font=("Segoe UI", 8),
+                     bg=BG, fg="#888888").pack(side=tk.LEFT)
+            self._spn_compress_mb = tk.Spinbox(
+                self._frm_compress_limit, textvariable=self._var_compress_mb,
+                values=(100, 200, 500, 1000, 2000, 0),
+                font=("Segoe UI", 9), width=5,
+                bg=BG_PANEL, fg=FG,
+                buttonbackground=BG_PANEL, insertbackground=FG, relief=tk.FLAT,
+            )
+            self._spn_compress_mb.pack(side=tk.LEFT, padx=(2, 2))
+            tk.Label(self._frm_compress_limit, text="MB (0=∞)", font=("Segoe UI", 8),
+                     bg=BG, fg="#888888").pack(side=tk.LEFT)
+            # Set initial state
+            self._on_inplace_toggle()
 
             # ── Enhancement option row ──
             row_enhance = tk.Frame(outer, bg=BG)
@@ -2284,6 +2551,24 @@ if __name__ == "__main__":
                 self.opts["last_folder"] = d
                 _save_opts(self.opts)
 
+        def _on_inplace_toggle(self):
+            """Gray out compress options when in-place mode is selected."""
+            inplace = self._var_inplace.get()
+            compress_state = tk.DISABLED if inplace else tk.NORMAL
+            self._chk_compress.configure(state=compress_state)
+            # Also update sub-row based on both inplace and compress checkbox
+            self._on_compress_toggle()
+
+        def _on_compress_toggle(self):
+            """Show/hide the size-limit sub-row; save option."""
+            inplace = self._var_inplace.get()
+            compress_on = self._var_compress.get() and not inplace
+            limit_state = tk.NORMAL if compress_on else tk.DISABLED
+            self._spn_compress_mb.configure(state=limit_state)
+            self.opts["compress_copy"] = self._var_compress.get()
+            self.opts["compress_max_mb"] = self._var_compress_mb.get()
+            _save_opts(self.opts)
+
         def _on_range_toggle(self):
             """Enable/disable all Range CTR option widgets based on checkbox state."""
             enabled = self._var_range.get()
@@ -2423,27 +2708,56 @@ Continue enabling password enhancement?"""
             # Manual B/C resolved here; auto mode is resolved per-file inside warp_fn
             r_b, r_c        = _range_resolve_bc(r_b_val, r_c_val, r_unit, 0)
 
+            # Compress options (copy mode only)
+            do_compress       = self._var_compress.get() and not use_inplace
+            compress_max_bytes = self._var_compress_mb.get() * 1_048_576
+            if do_compress:
+                self.opts["compress_copy"]   = True
+                self.opts["compress_max_mb"] = self._var_compress_mb.get()
+                _save_opts(self.opts)
+
             def _run():
                 for f in files:
                     try:
                         file_enc_size = f.stat().st_size if encrypt_all else enc_size
                         file_use_tail = False if encrypt_all else use_tail
-                        result = warp_fn(
-                            f, pw,
-                            kdf=kdf,
-                            base_folder=folder,
-                            encrypt_size=file_enc_size,
-                            encrypt_tail=file_use_tail,
-                            encrypt_middle=do_middle,
-                            encrypt_middle_size=do_middle_size,
-                            encrypt_range=do_range,
-                            range_start=r_start_bytes,
-                            range_end=r_end_bytes,
-                            range_b_bytes=r_b,
-                            range_c_bytes=r_c,
-                            range_mode=r_mode,
-                            range_percent=r_percent,
-                        )
+                        if use_inplace:
+                            result = warp_fn(
+                                f, pw,
+                                kdf=kdf,
+                                base_folder=folder,
+                                encrypt_size=file_enc_size,
+                                encrypt_tail=file_use_tail,
+                                encrypt_middle=do_middle,
+                                encrypt_middle_size=do_middle_size,
+                                encrypt_range=do_range,
+                                range_start=r_start_bytes,
+                                range_end=r_end_bytes,
+                                range_b_bytes=r_b,
+                                range_c_bytes=r_c,
+                                range_mode=r_mode,
+                                range_percent=r_percent,
+                            )
+                        else:
+                            result = warp_fn(
+                                f, pw,
+                                kdf=kdf,
+                                base_folder=folder,
+                                encrypt_size=file_enc_size,
+                                encrypt_tail=file_use_tail,
+                                encrypt_middle=do_middle,
+                                encrypt_middle_size=do_middle_size,
+                                encrypt_range=do_range,
+                                range_start=r_start_bytes,
+                                range_end=r_end_bytes,
+                                range_b_bytes=r_b,
+                                range_c_bytes=r_c,
+                                range_mode=r_mode,
+                                range_percent=r_percent,
+                                compress=do_compress,
+                                compress_max_bytes=compress_max_bytes,
+                                compress_skip_exts=self._compress_skip_exts,
+                            )
                     except (PermissionError, FileNotFoundError, OSError):
                         result = f"ERR: {f.name} - File access error"
                     except ValueError:
