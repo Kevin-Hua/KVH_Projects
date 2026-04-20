@@ -1,0 +1,129 @@
+{
+  "all": [],
+  "c": [
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp"
+  ],
+  "sdl": [
+    ".sdl",
+    ".ssp"
+  ],
+  "inf": [
+    ".inf"
+  ],
+  "dec": [
+    ".dec"
+  ],
+  "asm": [
+    ".asm",
+    ".css",
+    ".dat",
+    ".equ",
+    ".inc",
+    ".mac"
+  ],
+  "cfg": [
+    ".cfg"
+  ],
+  "mak": [
+    ".mak"
+  ],
+  "asl": [
+    ".asl",
+    ".asi",
+    ".oem"
+  ],
+  "dxs": [
+    ".dxs"
+  ],
+  "bat": [
+    ".bat",
+    ".cmd"
+  ],
+  "txt": [
+    ".txt"
+  ],
+  "uni": [
+    ".uni"
+  ],
+  "vfr": [
+    ".sd",
+    ".vfi",
+    ".vfr",
+    ".hfr"
+  ],
+  "py": [
+    ".py"
+  ],
+  "bin": [
+    ".bin",
+    ".rom",
+    ".efi",
+    ".fd"
+  ],
+  "skip": {
+    "max_file_mb": 64,
+    "folders": [
+      ".git",
+      "build",
+      "Flash_Image_Tool",
+      "__pycache__",
+      ".vs",
+      ".vscode",
+      "node_modules"
+    ],
+    "extensions": [
+      ".chm",
+      ".lib",
+      ".mcb",
+      ".exe",
+      ".pdf",
+      ".obj",
+      ".rom",
+      ".zip",
+      ".bin",
+      ".fd",
+      ".jar",
+      ".pdb",
+      ".asar",
+      ".pak",
+      ".7z",
+      ".dll",
+      ".bmp",
+      ".gif",
+      ".jpg",
+      ".efi",
+      ".png",
+      ".ttf",
+      ".key",
+      ".so",
+      ".sh",
+      ".ldl",
+      ".mof",
+      ".bsf",
+      ".s",
+      ".pem",
+      ".cbin",
+      ".aid",
+      ".db",
+      ".dbr",
+      ".csm"
+    ],
+    "filenames": [
+      "system.sys"
+    ],
+    "patterns": [
+      "RomAlignment.*",
+      "iasl*.*",
+      "BiosGuardCryptoCon*.*",
+      "HPKTool_Linux*.*",
+      "fit.*",
+      "cryptocon.*",
+      "cutrom.*",
+      "BpmKmGen.*",
+      "openssl.*"
+    ]
+  }
+}

@@ -1,0 +1,2303 @@
+﻿<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KVHSearch — 技術文件</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&family=Syne:wght@700;800&display=swap');
+
+  :root {
+    --bg:         #0d1117;
+    --bg2:        #161b22;
+    --bg3:        #1f2937;
+    --border:     #30363d;
+    --border2:    #21262d;
+    --accent:     #58a6ff;
+    --accent2:    #1f6feb;
+    --accent3:    #79c0ff;
+    --green:      #3fb950;
+    --yellow:     #e3b341;
+    --red:        #f85149;
+    --orange:     #f0883e;
+    --purple:     #bc8cff;
+    --text:       #e6edf3;
+    --text2:      #8b949e;
+    --text3:      #c9d1d9;
+    --code-bg:    #161b22;
+    --tag-bg:     #1f3244;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; overflow-x: hidden; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: var(--bg);
+    color: var(--text3);
+    font-size: 15px;
+    line-height: 1.75;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 260px;
+    min-height: 100vh;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    position: fixed;
+    top: 0; left: 0;
+    overflow-y: auto;
+    z-index: 100;
+    padding-bottom: 40px;
+  }
+
+  .sidebar-logo {
+    padding: 28px 20px 16px;
+    border-bottom: 1px solid var(--border2);
+  }
+
+  .sidebar-logo .logo-name {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .sidebar-logo .logo-sub {
+    font-size: 11px;
+    color: var(--text2);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .sidebar-logo .version-badge {
+    display: inline-block;
+    background: var(--tag-bg);
+    color: var(--accent3);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid var(--accent2);
+  }
+
+  .nav-section { padding: 18px 20px 8px; }
+
+  .nav-section-title {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text2);
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .nav-section a {
+    display: block;
+    padding: 5px 10px;
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+  }
+
+  .nav-section a:hover {
+    color: var(--text);
+    background: var(--bg3);
+    border-left-color: var(--accent2);
+  }
+
+  .nav-section a.active {
+    color: var(--accent3);
+    background: var(--tag-bg);
+    border-left-color: var(--accent);
+  }
+
+  /* ── Main content ── */
+  #main {
+    margin-left: 260px;
+    flex: 1;
+    min-width: 0;
+    max-width: 1000px;
+    overflow-x: hidden;
+    padding: 60px 56px;
+  }
+
+  /* ── Section headers ── */
+  .section {
+    margin-bottom: 72px;
+    scroll-margin-top: 32px;
+  }
+
+  .section-eyebrow {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: 10px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.15;
+    margin-bottom: 20px;
+    letter-spacing: -1px;
+  }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border2);
+    letter-spacing: -0.5px;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent3);
+    margin: 28px 0 12px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.3px;
+  }
+
+  h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 20px 0 8px;
+  }
+
+  p { color: var(--text3); margin-bottom: 14px; }
+
+  /* ── Code ── */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--code-bg);
+    border: 1px solid var(--border2);
+    color: var(--orange);
+    font-size: 13px;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    overflow-x: auto;
+    margin: 16px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    position: relative;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    color: var(--text3);
+    padding: 0;
+    font-size: inherit;
+  }
+
+  .pre-label {
+    position: absolute;
+    top: 10px; right: 14px;
+    font-size: 10px;
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Syntax colours */
+  .kw { color: #ff7b72; }
+  .fn { color: #d2a8ff; }
+  .st { color: #a5d6ff; }
+  .cm { color: #8b949e; font-style: italic; }
+  .nu { color: #79c0ff; }
+  .op { color: var(--text2); }
+
+  /* ── Callout boxes ── */
+  .callout {
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-left: 3px solid;
+    display: flex;
+    gap: 12px;
+  }
+
+  .callout .icon { font-size: 18px; flex-shrink: 0; line-height: 1.6; }
+  .callout .body { flex: 1; }
+  .callout .body strong { display: block; margin-bottom: 4px; font-size: 14px; }
+
+  .callout.info   { background: #1d2d3e; border-color: var(--accent);  }
+  .callout.warn   { background: #2d1e0f; border-color: var(--yellow);  }
+  .callout.danger { background: #2d1118; border-color: var(--red);     }
+  .callout.tip    { background: #0d2218; border-color: var(--green);   }
+
+  /* ── Tables ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 13.5px;
+  }
+
+  thead tr { background: var(--bg3); }
+
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text2);
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border2);
+    vertical-align: top;
+    color: var(--text3);
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tbody tr:hover { background: #1a2030; }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+
+  .badge.green  { background: #0d2218; color: var(--green);  border: 1px solid #1a4a30; }
+  .badge.blue   { background: #0d1f38; color: var(--accent3); border: 1px solid #1a3a6a; }
+  .badge.yellow { background: #2a1f00; color: var(--yellow); border: 1px solid #4a3a00; }
+  .badge.red    { background: #2d1118; color: var(--red);    border: 1px solid #5a2030; }
+  .badge.purple { background: #1e1430; color: var(--purple); border: 1px solid #3a2a5a; }
+  .badge.gray   { background: #1a1f25; color: var(--text2);  border: 1px solid var(--border); }
+
+  /* ── Grid cards ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: var(--accent2); }
+
+  .card .card-icon { font-size: 24px; margin-bottom: 10px; }
+  .card .card-title { font-weight: 700; color: var(--text); margin-bottom: 6px; font-size: 14px; }
+  .card .card-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+  /* ── SVG diagrams ── */
+  .diagram-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin: 24px 0;
+    overflow-x: auto;
+  }
+
+  .diagram-title {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 20px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Step list ── */
+  .step-list { counter-reset: steps; margin: 16px 0; }
+
+  .step {
+    counter-increment: steps;
+    display: flex;
+    gap: 16px;
+    margin-bottom: 18px;
+    align-items: flex-start;
+  }
+
+  .step::before {
+    content: counter(steps);
+    min-width: 28px;
+    height: 28px;
+    background: var(--tag-bg);
+    color: var(--accent3);
+    border: 1px solid var(--accent2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .step-body { flex: 1; }
+  .step-body strong { color: var(--text); display: block; margin-bottom: 4px; }
+
+  /* ── Limit / benefit list ── */
+  .limit-list, .benefit-list { list-style: none; margin: 16px 0; }
+
+  .limit-list li, .benefit-list li {
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .limit-list li   { background: #1e1218; border: 1px solid #3d2030; color: var(--text3); }
+  .benefit-list li { background: #0d1e18; border: 1px solid #1a3a28; color: var(--text3); }
+
+  .limit-list li::before   { content: "✕"; color: var(--red);   font-weight: 700; font-size: 12px; flex-shrink: 0; margin-top: 2px; }
+  .benefit-list li::before { content: "✓"; color: var(--green); font-weight: 700; font-size: 12px; flex-shrink: 0; margin-top: 2px; }
+
+  /* ── Header hero ── */
+  .hero {
+    background: linear-gradient(135deg, #0d1117 0%, #111827 50%, #0d1724 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px;
+    margin-bottom: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 280px; height: 280px;
+    background: radial-gradient(circle, rgba(31,111,235,0.12) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .hero::after {
+    content: 'KVH';
+    position: absolute;
+    bottom: -20px; right: 30px;
+    font-family: 'Syne', sans-serif;
+    font-size: 130px;
+    font-weight: 800;
+    color: rgba(88,166,255,0.04);
+    line-height: 1;
+    user-select: none;
+    letter-spacing: -5px;
+  }
+
+  .hero-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+
+  .hero-desc {
+    font-size: 15px;
+    color: var(--text2);
+    max-width: 580px;
+    line-height: 1.8;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border2);
+    margin: 40px 0;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg2); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+  @media (max-width: 860px) {
+    #sidebar { display: none; }
+    #main { margin-left: 0; padding: 30px 20px; }
+    .card-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Language toggle ── */
+  .lang-switch {
+    position: fixed;
+    top: 14px;
+    right: 20px;
+    z-index: 300;
+    display: flex;
+    gap: 6px;
+  }
+  .lang-switch button {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+  }
+  .lang-switch button:hover  { border-color: var(--accent2); color: var(--text); }
+  .lang-switch button.active { background: var(--tag-bg); border-color: var(--accent); color: var(--accent3); }
+
+  /* ── Bilingual content ── */
+  .en            { display: none; }
+  span.en        { display: none; }
+  body.lang-en .zh      { display: none; }
+  body.lang-en .en      { display: block; }
+  body.lang-en span.zh  { display: none; }
+  body.lang-en span.en  { display: inline; }
+</style>
+</head>
+<body>
+
+<div class="lang-switch">
+  <button id="btn-zh" class="active" onclick="setLang('zh')">中文</button>
+  <button id="btn-en" onclick="setLang('en')">EN</button>
+</div>
+
+<!-- ════════════════════════════════ SIDEBAR ════════════════════════════════ -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-name">KVHSearch</div>
+    <div class="logo-sub"><span class="zh">全文倒排索引引擎</span><span class="en">Full-text Trigram Search</span></div>
+    <div class="version-badge">v1.0.0</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-title"><span class="zh">概觀</span><span class="en">Overview</span></div>
+    <a href="#overview"><span class="zh">專案簡介</span><span class="en">Project Overview</span></a>
+    <a href="#architecture"><span class="zh">系統架構</span><span class="en">Architecture</span></a>
+    <a href="#files"><span class="zh">檔案結構</span><span class="en">File Structure</span></a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-title"><span class="zh">索引建立</span><span class="en">Index Build</span></div>
+    <a href="#build-algo"><span class="zh">索引演算法</span><span class="en">Algorithm</span></a>
+    <a href="#build-cmd"><span class="zh">Build 指令</span><span class="en">Build Commands</span></a>
+    <a href="#tiered-index"><span class="zh">分層索引設計</span><span class="en">Tiered Index</span></a>
+    <a href="#change-detect"><span class="zh">變更偵測策略</span><span class="en">Change Detection</span></a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-title"><span class="zh">搜尋</span><span class="en">Search</span></div>
+    <a href="#search-mode"><span class="zh">搜尋模式選擇</span><span class="en">Search Mode</span></a>
+    <a href="#search-types"><span class="zh">搜尋類型</span><span class="en">Search Types</span></a>
+    <a href="#search-filters"><span class="zh">搜尋篩選器</span><span class="en">Filters</span></a>
+    <a href="#merge-logic"><span class="zh">合併邏輯</span><span class="en">Merge Logic</span></a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-title"><span class="zh">進階</span><span class="en">Advanced</span></div>
+    <a href="#flowcharts"><span class="zh">流程圖</span><span class="en">Flowcharts</span></a>
+    <a href="#hex-index"><span class="zh">HEX 索引</span><span class="en">HEX Index</span></a>
+    <a href="#fuzzy"><span class="zh">Fuzzy 演算法</span><span class="en">Fuzzy Algo</span></a>
+    <a href="#auto-build"><span class="zh">自動建立</span><span class="en">Auto-build</span></a>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-title"><span class="zh">評估</span><span class="en">Evaluation</span></div>
+    <a href="#benefits"><span class="zh">優點</span><span class="en">Benefits</span></a>
+    <a href="#limitations"><span class="zh">限制</span><span class="en">Limitations</span></a>
+    <a href="#comparison"><span class="zh">工具比較</span><span class="en">Comparison</span></a>
+    <a href="#examples"><span class="zh">使用範例</span><span class="en">Examples</span></a>
+    <a href="#summary"><span class="zh">總結</span><span class="en">Summary</span></a>
+    <a href="#test-results">Test Results</a>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════ MAIN ════════════════════════════════ -->
+<main id="main">
+
+  <!-- ── Hero ── -->
+  <div class="hero">
+    <div class="hero-tags">
+      <span class="badge blue">Python 3.10+</span>
+      <span class="badge blue">SQLite FTS5</span>
+      <span class="badge green">Trigram</span>
+      <span class="badge purple">Multi-threaded</span>
+      <span class="badge yellow">Git-aware</span>
+      <span class="badge gray">20,000 files / 2 GB</span>
+    </div>
+    <h1>KVHSearch</h1>
+    <p class="hero-desc">
+      以 SQLite FTS5 Trigram 倒排索引為核心的高效原始碼搜尋引擎，
+      針對大型 Git 倉庫（~20,000 檔案、~2 GB）設計。
+      支援分層索引架構（Main + Minor）、多執行緒並行建立、
+      以及精確／前綴／子字串／Glob 萬用字元／Fuzzy／HEX 六種搜尋模式。
+    </p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 1. 專案簡介 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="overview">
+    <div class="section-eyebrow">01 / overview</div>
+    <h2><span class="zh">專案簡介</span><span class="en">Project Overview</span></h2>
+
+    <div class="zh"><p>
+      KVHSearch 是一套為大型韌體／BIOS Git 倉庫量身打造的<strong>離線全文索引搜尋系統</strong>。
+      它以 SQLite 的 FTS5 虛擬表（Trigram tokenizer）作為倒排索引後端，
+      並在 Python 層提供 CLI 介面與 GUI 介面，讓工程師能在毫秒級完成跨越萬支檔案的關鍵字搜尋，
+      而不需要依賴網路、伺服器或 Elasticsearch 等重量級工具。
+    </p></div>
+    <div class="en"><p>
+      KVHSearch is an <strong>offline full-text trigram search system</strong> purpose-built for large UEFI/BIOS Git repositories.
+      It uses SQLite FTS5 (Trigram tokenizer) as the inverted-index backend and exposes both a CLI and a GUI,
+      enabling engineers to search across tens of thousands of files in milliseconds—no network, no server, no Elasticsearch required.
+    </p></div>
+
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-icon">⚡</div>
+        <div class="card-title"><span class="zh">毫秒級查詢</span><span class="en">Sub-50ms Queries</span></div>
+        <div class="card-desc"><span class="zh">建立索引後，任何搜尋皆透過 SQLite FTS5 倒排索引完成，不需逐檔掃描，典型查詢時間 &lt; 50 ms。</span><span class="en">After indexing, all searches run against the FTS5 inverted index—no linear file scan. Typical query time &lt; 50 ms.</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">📦</div>
+        <div class="card-title"><span class="zh">分層 DB 架構</span><span class="en">Tiered DB Architecture</span></div>
+        <div class="card-desc"><span class="zh">Main Index 作為完整快照，Minor Index 僅記錄差異，兩者合併查詢，節省磁碟空間與建立時間。</span><span class="en">Main Index is a full snapshot; Minor Index holds only diffs. Merged at query time—saves disk space and rebuild time.</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🧵</div>
+        <div class="card-title"><span class="zh">多執行緒建立</span><span class="en">Multi-threaded Build</span></div>
+        <div class="card-desc"><span class="zh">IO/CPU 密集的讀檔、雜湊、解碼由 ThreadPoolExecutor 並行處理；SQLite 寫入由獨立 writer thread 序列化。</span><span class="en">IO/CPU-intensive file reads, hashing, and decoding run in parallel via ThreadPoolExecutor; SQLite writes are serialized by a dedicated writer thread.</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔁</div>
+        <div class="card-title">Git-aware 增量</div>
+        <div class="card-desc">優先使用 git blob SHA 比對（零次讀檔），其次 mtime 快速比對，最後才 BLAKE2b 雜湊，三層跳過策略大幅縮短重建時間。</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔍</div>
+        <div class="card-title"><span class="zh">六種搜尋模式</span><span class="en">Six Search Modes</span></div>
+        <div class="card-desc"><span class="zh">精確（AND）、前綴、子字串、Glob 萬用字元、Fuzzy 編輯距離、HEX 二進位搜尋，搭配副檔名／路徑／glob 排除／grep 四層篩選器。</span><span class="en">Exact (AND), prefix, substring, glob wildcard, fuzzy edit-distance, HEX binary—plus four post-query filters: ext, path, exclude, grep.</span></div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🗂️</div>
+        <div class="card-title">向下相容</div>
+        <div class="card-desc">自動偵測舊版 <code>file_index.db</code>、單 Main 模式、分層 Tiered 模式，三種情境無縫切換，不需手動配置。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 2. 系統架構 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="architecture">
+    <div class="section-eyebrow">02 / architecture</div>
+    <h2><span class="zh">系統架構</span><span class="en">System Architecture</span></h2>
+
+    <div class="zh"><p>整個系統分為三個層次：CLI/GUI 介面層、核心引擎層、以及 SQLite 儲存層。</p></div>
+    <div class="en"><p>The system is divided into three layers: the CLI/GUI interface layer, the core engine layer, and the SQLite storage layer.</p></div>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">── 系統層次圖</div>
+      <svg viewBox="0 0 760 320" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace;">
+        <defs>
+          <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#1f3244;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#0d1f38;stop-opacity:1" />
+          </linearGradient>
+          <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#1a3a28;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#0d2218;stop-opacity:1" />
+          </linearGradient>
+          <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#2a2010;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#1a1200;stop-opacity:1" />
+          </linearGradient>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#30363d"/>
+          </marker>
+        </defs>
+
+        <!-- Layer 1: Interface -->
+        <rect x="30" y="20" width="700" height="70" rx="10" fill="url(#g1)" stroke="#1f6feb" stroke-width="1"/>
+        <text x="380" y="42" fill="#58a6ff" text-anchor="middle" font-size="10" letter-spacing="3">INTERFACE LAYER</text>
+        <rect x="50" y="52" width="200" height="28" rx="6" fill="#162232" stroke="#1f6feb" stroke-width="1"/>
+        <text x="150" y="70" fill="#79c0ff" text-anchor="middle" font-size="12">Build_Index_cli.py</text>
+        <rect x="280" y="52" width="200" height="28" rx="6" fill="#162232" stroke="#1f6feb" stroke-width="1"/>
+        <text x="380" y="70" fill="#79c0ff" text-anchor="middle" font-size="12">Search_cli.py</text>
+        <rect x="510" y="52" width="200" height="28" rx="6" fill="#162232" stroke="#1f6feb" stroke-width="1"/>
+        <text x="610" y="70" fill="#79c0ff" text-anchor="middle" font-size="12">KVHSearch_Gui.py</text>
+
+        <!-- Arrow down -->
+        <line x1="380" y1="92" x2="380" y2="118" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Layer 2: Core Engine -->
+        <rect x="30" y="120" width="700" height="90" rx="10" fill="url(#g2)" stroke="#3fb950" stroke-width="1"/>
+        <text x="380" y="142" fill="#3fb950" text-anchor="middle" font-size="10" letter-spacing="3">CORE ENGINE — kvhsearch_core.py</text>
+
+        <rect x="50" y="152" width="150" height="46" rx="6" fill="#0d2218" stroke="#1a4a30" stroke-width="1"/>
+        <text x="125" y="172" fill="#c9d1d9" text-anchor="middle" font-size="11">Index Builder</text>
+        <text x="125" y="188" fill="#8b949e" text-anchor="middle" font-size="10">build_main/minor/chain</text>
+
+        <rect x="218" y="152" width="150" height="46" rx="6" fill="#0d2218" stroke="#1a4a30" stroke-width="1"/>
+        <text x="293" y="172" fill="#c9d1d9" text-anchor="middle" font-size="11">Search Engine</text>
+        <text x="293" y="188" fill="#8b949e" text-anchor="middle" font-size="10">exact/prefix/substr/fuzzy/hex</text>
+
+        <rect x="386" y="152" width="150" height="46" rx="6" fill="#0d2218" stroke="#1a4a30" stroke-width="1"/>
+        <text x="461" y="172" fill="#c9d1d9" text-anchor="middle" font-size="11">Git Integration</text>
+        <text x="461" y="188" fill="#8b949e" text-anchor="middle" font-size="10">diff/blob SHA/stash</text>
+
+        <rect x="554" y="152" width="158" height="46" rx="6" fill="#0d2218" stroke="#1a4a30" stroke-width="1"/>
+        <text x="633" y="172" fill="#c9d1d9" text-anchor="middle" font-size="11">Thread Manager</text>
+        <text x="633" y="188" fill="#8b949e" text-anchor="middle" font-size="10">ThreadPoolExecutor + writer</text>
+
+        <!-- Arrow down -->
+        <line x1="380" y1="212" x2="380" y2="238" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Layer 3: Storage -->
+        <rect x="30" y="240" width="700" height="64" rx="10" fill="url(#g3)" stroke="#e3b341" stroke-width="1"/>
+        <text x="380" y="262" fill="#e3b341" text-anchor="middle" font-size="10" letter-spacing="3">SQLITE STORAGE LAYER</text>
+
+        <rect x="60" y="272" width="155" height="24" rx="5" fill="#1a1200" stroke="#4a3a00" stroke-width="1"/>
+        <text x="137" y="288" fill="#c9d1d9" text-anchor="middle" font-size="11">main_index.db</text>
+
+        <rect x="232" y="272" width="155" height="24" rx="5" fill="#1a1200" stroke="#4a3a00" stroke-width="1"/>
+        <text x="310" y="288" fill="#c9d1d9" text-anchor="middle" font-size="11">minor_&lt;sha&gt;.db × N</text>
+
+        <rect x="404" y="272" width="155" height="24" rx="5" fill="#1a1200" stroke="#4a3a00" stroke-width="1"/>
+        <text x="482" y="288" fill="#c9d1d9" text-anchor="middle" font-size="11">file_index.db (legacy)</text>
+
+        <rect x="576" y="272" width="134" height="24" rx="5" fill="#1a1200" stroke="#4a3a00" stroke-width="1"/>
+        <text x="643" y="288" fill="#c9d1d9" text-anchor="middle" font-size="11">FTS5 Trigram VT</text>
+      </svg>
+    </div>
+
+    <h3><span class="zh">核心模組職責</span><span class="en">Core Module Responsibilities</span></h3>
+    <table>
+      <thead>
+        <tr><th><span class="zh">模組</span><span class="en">Module</span></th><th><span class="zh">職責</span><span class="en">Responsibility</span></th><th><span class="zh">關鍵函式</span><span class="en">Key Functions</span></th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>kvhsearch_core.py</code></td><td><span class="zh">全部邏輯：索引建立、搜尋、Git 整合、DB 管理</span><span class="en">All logic: index build, search, Git integration, DB management</span></td><td><code>build_index</code>, <code>search_exact</code>, <code>_get_active_conns</code></td></tr>
+        <tr><td><code>Build_Index_cli.py</code></td><td><span class="zh">索引建立 CLI 解析，委派給 core</span><span class="en">Index-build CLI parser, delegates to core</span></td><td><code>main()</code>, <code>_apply_label()</code>, <code>_apply_db_dir()</code></td></tr>
+        <tr><td><code>Search_cli.py</code></td><td><span class="zh">搜尋 CLI 解析，委派給 core</span><span class="en">Search CLI parser, delegates to core</span></td><td><code>main()</code></td></tr>
+        <tr><td><code>KVHSearch_Gui.py</code></td><td><span class="zh">Tkinter GUI 介面，呼叫 core 的搜尋函式</span><span class="en">Tkinter GUI interface, calls core search functions</span></td><td>Tkinter widgets</td></tr>
+        <tr><td><code>build_index_profiles.json</code></td><td><span class="zh">副檔名 Profile 定義 + 跳過規則設定</span><span class="en">Extension Profile definitions + skip rule config</span></td><td><span class="zh">（JSON 設定檔）</span><span class="en">(JSON config file)</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 3. 檔案結構 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="files">
+    <div class="section-eyebrow">03 / file structure</div>
+    <h2><span class="zh">檔案結構</span><span class="en">File Structure</span></h2>
+
+    <pre><code><span class="cm"># 來源目錄（工具本身）</span>
+kvhsearch/
+├── kvhsearch_core.py          <span class="cm"># 核心引擎（2,400+ 行）</span>
+├── Build_Index_cli.py         <span class="cm"># 索引建立 CLI</span>
+├── Search_cli.py              <span class="cm"># 搜尋 CLI</span>
+├── KVHSearch_Gui.py           <span class="cm"># Tkinter GUI</span>
+└── build_index_profiles.json  <span class="cm"># 副檔名 Profile + 跳過規則（自動產生）</span>
+
+<span class="cm"># 索引 DB（可用 --db-dir 指定另一個目錄）</span>
+indexes/
+├── main_index.db              <span class="cm"># 完整 Main Index（或 main_v08.db）</span>
+├── minor_&lt;sha7&gt;.db            <span class="cm"># 差量 Minor Index × N</span>
+└── file_index.db              <span class="cm"># 舊版單一索引（向下相容）</span></code></pre>
+
+    <h3><span class="zh">SQLite DB 內部結構</span><span class="en">SQLite DB Internal Structure</span></h3>
+    <div class="zh"><p>每個 <code>.db</code> 檔案（main 或 minor）都包含相同的 schema：</p></div><div class="en"><p>Every <code>.db</code> file (main or minor) shares the same schema:</p></div>
+    <pre><code><span class="cm">-- 檔案元資料</span>
+<span class="kw">CREATE TABLE</span> file_meta (
+    id          <span class="kw">INTEGER PRIMARY KEY</span>,
+    path        <span class="kw">TEXT UNIQUE NOT NULL</span>,   <span class="cm">-- 絕對路徑</span>
+    mtime       REAL,                      <span class="cm">-- 修改時間戳</span>
+    md5         TEXT,                      <span class="cm">-- BLAKE2b-20 雜湊值</span>
+    is_text     <span class="kw">INTEGER</span>,                <span class="cm">-- 1=文字檔, 0=二進位</span>
+    ext         TEXT,                      <span class="cm">-- 副檔名（小寫）</span>
+    hex_indexed <span class="kw">INTEGER DEFAULT</span> <span class="nu">0</span>,      <span class="cm">-- 是否建立 HEX 索引</span>
+    blob_sha    TEXT                       <span class="cm">-- git blob SHA1</span>
+);
+
+<span class="cm">-- FTS5 倒排索引（Trigram tokenizer）</span>
+<span class="kw">CREATE VIRTUAL TABLE</span> file_content
+<span class="kw">USING</span> fts5(
+    path      <span class="kw">UNINDEXED</span>,
+    content,
+    tokenize = <span class="st">'trigram'</span>
+);
+
+<span class="cm">-- 版本 / 分支 元資料</span>
+<span class="kw">CREATE TABLE</span> index_meta (key TEXT <span class="kw">PRIMARY KEY</span>, value TEXT);
+<span class="cm">-- 儲存：last_commit, branch_name, base_commit, branch_head, build_time</span>
+
+<span class="cm">-- 僅 Minor DB：已刪除檔案的 tombstone 清單</span>
+<span class="kw">CREATE TABLE</span> tombstones (path TEXT <span class="kw">PRIMARY KEY</span>);</code></pre>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 4. 索引演算法 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="build-algo">
+    <div class="section-eyebrow">04 / algorithm</div>
+    <h2><span class="zh">索引建立演算法</span><span class="en">Index Build Algorithm</span></h2>
+
+    <h3><span class="zh">Trigram 倒排索引</span><span class="en">Trigram Inverted Index</span></h3>
+    <div class="zh"><p>
+      SQLite FTS5 的 <code>tokenize = 'trigram'</code> 會將每個字串切成連續的 3 字元滑動視窗 token，
+      並為每個 token 建立倒排清單（指向包含該 token 的 row）。
+    </p></div>
+    <div class="en"><p>
+      SQLite FTS5's <code>tokenize = 'trigram'</code> slices every string into consecutive
+      3-character sliding-window tokens and builds an inverted list for each token
+      (pointing to the rows that contain it).
+    </p></div>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">── Trigram 分割示意</div>
+      <svg viewBox="0 0 700 120" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace;">
+        <text x="20" y="30" fill="#8b949e" font-size="11">輸入字串：</text>
+        <text x="120" y="30" fill="#f0883e" font-size="13" font-weight="600">"OemDxe"</text>
+
+        <line x1="20" y1="42" x2="680" y2="42" stroke="#30363d" stroke-width="1"/>
+
+        <text x="20" y="62" fill="#8b949e" font-size="11">Trigram tokens：</text>
+
+        <!-- tokens -->
+        <rect x="130" y="50" width="48" height="24" rx="5" fill="#0d1f38" stroke="#1f6feb"/>
+        <text x="154" y="67" fill="#79c0ff" text-anchor="middle" font-size="12">Oem</text>
+        <rect x="186" y="50" width="48" height="24" rx="5" fill="#0d1f38" stroke="#1f6feb"/>
+        <text x="210" y="67" fill="#79c0ff" text-anchor="middle" font-size="12">emD</text>
+        <rect x="242" y="50" width="48" height="24" rx="5" fill="#0d1f38" stroke="#1f6feb"/>
+        <text x="266" y="67" fill="#79c0ff" text-anchor="middle" font-size="12">mDx</text>
+        <rect x="298" y="50" width="48" height="24" rx="5" fill="#0d1f38" stroke="#1f6feb"/>
+        <text x="322" y="67" fill="#79c0ff" text-anchor="middle" font-size="12">Dxe</text>
+
+        <text x="20" y="100" fill="#8b949e" font-size="11">特性：任何 3 字元子字串都能命中對應 token → 支援任意位置子字串搜尋</text>
+      </svg>
+    </div>
+
+    <h3><span class="zh">三層變更偵測策略</span><span class="en">Three-tier Change Detection</span></h3>
+    <div class="zh"><p>
+      <code>_process_file()</code> 函式在工作執行緒中依序套用以下三種策略，
+      一旦判斷為「未變更」就立刻跳過，不讀檔案內容，大幅減少 IO：
+    </p></div>
+    <div class="en"><p>
+      The <code>_process_file()</code> worker applies the following three strategies in order.
+      As soon as a file is determined "unchanged", it is skipped immediately—no file
+      content is read—dramatically reducing disk I/O.
+    </p></div>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">── 變更偵測優先順序（快→慢）</div>
+      <svg viewBox="0 0 700 200" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace;">
+        <defs>
+          <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#30363d"/>
+          </marker>
+        </defs>
+        <!-- Step 1 -->
+        <rect x="20" y="20" width="200" height="56" rx="8" fill="#0d2218" stroke="#3fb950"/>
+        <text x="120" y="44" fill="#3fb950" text-anchor="middle" font-size="12" font-weight="600">① git blob SHA 比對</text>
+        <text x="120" y="62" fill="#8b949e" text-anchor="middle" font-size="10">比對 git ls-files -s 的 SHA1</text>
+        <text x="120" y="76" fill="#8b949e" text-anchor="middle" font-size="10">相同 → touch（零讀檔）</text>
+
+        <line x1="222" y1="48" x2="256" y2="48" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr2)"/>
+        <text x="239" y="40" fill="#8b949e" font-size="9" text-anchor="middle">SHA 不同</text>
+
+        <!-- Step 2 -->
+        <rect x="258" y="20" width="200" height="56" rx="8" fill="#1d2d3e" stroke="#58a6ff"/>
+        <text x="358" y="44" fill="#58a6ff" text-anchor="middle" font-size="12" font-weight="600">② mtime 比對</text>
+        <text x="358" y="62" fill="#8b949e" text-anchor="middle" font-size="10">非 git tracked 檔案</text>
+        <text x="358" y="76" fill="#8b949e" text-anchor="middle" font-size="10">mtime diff &lt; 0.01s → skip</text>
+
+        <line x1="460" y1="48" x2="494" y2="48" stroke="#30363d" stroke-width="1.5" marker-end="url(#arr2)"/>
+        <text x="477" y="40" fill="#8b949e" font-size="9" text-anchor="middle">mtime 不同</text>
+
+        <!-- Step 3 -->
+        <rect x="496" y="20" width="184" height="56" rx="8" fill="#2d1e0f" stroke="#e3b341"/>
+        <text x="588" y="44" fill="#e3b341" text-anchor="middle" font-size="12" font-weight="600">③ BLAKE2b hash</text>
+        <text x="588" y="62" fill="#8b949e" text-anchor="middle" font-size="10">讀取完整檔案計算雜湊</text>
+        <text x="588" y="76" fill="#8b949e" text-anchor="middle" font-size="10">相同 → touch，不同 → update</text>
+
+        <!-- Bottom annotations -->
+        <text x="120" y="115" fill="#3fb950" text-anchor="middle" font-size="10">最快：O(1) 字串比對</text>
+        <text x="120" y="130" fill="#3fb950" text-anchor="middle" font-size="10">零 disk IO</text>
+
+        <text x="358" y="115" fill="#58a6ff" text-anchor="middle" font-size="10">快：stat() 系統呼叫</text>
+        <text x="358" y="130" fill="#58a6ff" text-anchor="middle" font-size="10">僅 metadata，不讀內容</text>
+
+        <text x="588" y="115" fill="#e3b341" text-anchor="middle" font-size="10">慢：完整讀檔</text>
+        <text x="588" y="130" fill="#e3b341" text-anchor="middle" font-size="10">digest_size=20 bytes</text>
+
+        <text x="20" y="165" fill="#8b949e" font-size="10">實際模式選擇：git diff 可用 → 只處理 changed files；git ls-files 可用 → 全追蹤清單；否則 → rglob 全掃描</text>
+      </svg>
+    </div>
+
+    <h3><span class="zh">多執行緒架構</span><span class="en">Multi-threaded Architecture</span></h3>
+    <div class="zh"><p>
+      建立索引時採用 <strong>Producer-Consumer</strong> 模型，讀檔與雜湊計算高度並行，
+      SQLite 寫入由單一 writer thread 序列化（避免鎖衝突）：
+    </p></div>
+    <div class="en"><p>
+      Index building uses a <strong>Producer-Consumer</strong> model: file reads and hash
+      computation run in parallel, while SQLite writes are serialised by a single writer
+      thread to avoid lock contention:
+    </p></div>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">── Producer-Consumer 執行流程</div>
+      <svg viewBox="0 0 700 180" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace;">
+        <defs>
+          <marker id="arr3" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+          </marker>
+        </defs>
+
+        <!-- Main thread -->
+        <rect x="20" y="20" width="160" height="140" rx="8" fill="#0d1f38" stroke="#1f6feb"/>
+        <text x="100" y="44" fill="#58a6ff" text-anchor="middle" font-size="11" font-weight="600">Main Thread</text>
+        <text x="100" y="62" fill="#8b949e" text-anchor="middle" font-size="10">掃描 process_paths</text>
+        <text x="100" y="78" fill="#8b949e" text-anchor="middle" font-size="10">呼叫 _should_skip()</text>
+        <text x="100" y="94" fill="#8b949e" text-anchor="middle" font-size="10">submit 到 pool</text>
+        <text x="100" y="110" fill="#8b949e" text-anchor="middle" font-size="10">drain pending futures</text>
+        <text x="100" y="126" fill="#8b949e" text-anchor="middle" font-size="10">put result to wq</text>
+        <text x="100" y="148" fill="#3fb950" text-anchor="middle" font-size="10">進度條顯示</text>
+
+        <!-- ThreadPoolExecutor -->
+        <rect x="220" y="20" width="220" height="140" rx="8" fill="#0d2218" stroke="#3fb950"/>
+        <text x="330" y="44" fill="#3fb950" text-anchor="middle" font-size="11" font-weight="600">ThreadPoolExecutor</text>
+        <text x="330" y="60" fill="#8b949e" text-anchor="middle" font-size="10">N workers（預設 CPU×2，max 32）</text>
+        <rect x="234" y="68" width="192" height="24" rx="4" fill="#162218" stroke="#1a4a30"/>
+        <text x="330" y="84" fill="#c9d1d9" text-anchor="middle" font-size="10">_process_file() worker</text>
+        <rect x="234" y="96" width="192" height="24" rx="4" fill="#162218" stroke="#1a4a30"/>
+        <text x="330" y="112" fill="#c9d1d9" text-anchor="middle" font-size="10">_process_file() worker</text>
+        <rect x="234" y="124" width="192" height="24" rx="4" fill="#162218" stroke="#1a4a30"/>
+        <text x="330" y="140" fill="#c9d1d9" text-anchor="middle" font-size="10">_process_file() worker</text>
+        <text x="330" y="156" fill="#8b949e" text-anchor="middle" font-size="9">讀檔 + BLAKE2b + 解碼 + 萃取</text>
+
+        <!-- Queue -->
+        <rect x="476" y="60" width="54" height="80" rx="6" fill="#1a1200" stroke="#e3b341"/>
+        <text x="503" y="98" fill="#e3b341" text-anchor="middle" font-size="10" font-weight="600">Queue</text>
+        <text x="503" y="114" fill="#8b949e" text-anchor="middle" font-size="9">wq</text>
+
+        <!-- Writer thread -->
+        <rect x="560" y="20" width="120" height="140" rx="8" fill="#2d1118" stroke="#f85149"/>
+        <text x="620" y="44" fill="#f85149" text-anchor="middle" font-size="11" font-weight="600">Writer Thread</text>
+        <text x="620" y="62" fill="#8b949e" text-anchor="middle" font-size="10">消費 wq</text>
+        <text x="620" y="78" fill="#8b949e" text-anchor="middle" font-size="10">批次 INSERT</text>
+        <text x="620" y="94" fill="#8b949e" text-anchor="middle" font-size="10">BATCH_SIZE=200</text>
+        <text x="620" y="110" fill="#8b949e" text-anchor="middle" font-size="10">commit()</text>
+        <text x="620" y="130" fill="#8b949e" text-anchor="middle" font-size="10">save_git_commit</text>
+        <text x="620" y="148" fill="#f85149" text-anchor="middle" font-size="10">序列化寫入</text>
+
+        <!-- Arrows -->
+        <line x1="182" y1="90" x2="218" y2="90" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr3)"/>
+        <line x1="442" y1="90" x2="474" y2="100" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr3)"/>
+        <line x1="532" y1="100" x2="558" y2="90" stroke="#e3b341" stroke-width="1.5" marker-end="url(#arr3)"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 5. Build 指令 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="build-cmd">
+    <div class="section-eyebrow">05 / build commands</div>
+    <h2><span class="zh">Build 指令詳解</span><span class="en">Build Commands</span></h2>
+
+    <table>
+      <thead>
+        <tr><th><span class="zh">指令</span><span class="en">Command</span></th><th><span class="zh">輸出 DB</span><span class="en">Output DB</span></th><th><span class="zh">適用情境</span><span class="en">Use Case</span></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>build</code></td>
+          <td><code>file_index.db</code></td>
+          <td><span class="zh">舊版單一索引，不支援分層（向下相容用）</span><span class="en">Legacy single-index mode, no tiering (backward compatibility)</span></td>
+        </tr>
+        <tr>
+          <td><code>build_main</code></td>
+          <td><code>main_index.db</code> 或 <code>main_v08.db</code></td>
+          <td><span class="zh">在 main/master 分支建立完整基礎索引，作為所有 minor 的 base</span><span class="en">Build a full baseline index on the main/master branch; serves as the base for all minors</span></td>
+        </tr>
+        <tr>
+          <td><code>build_minor</code></td>
+          <td><code>minor_&lt;sha7&gt;.db</code></td>
+          <td><span class="zh">目前分支 vs main 的 git diff 差量，只包含新增/修改/刪除（tombstone）</span><span class="en">git diff delta of current branch vs main; contains only adds/modifications/deletions (tombstone)</span></td>
+        </tr>
+        <tr>
+          <td><code>build_chain</code></td>
+          <td><span class="zh">多個</span><span class="en">Multiple</span> <code>minor_*.db</code></td>
+          <td><span class="zh">一次為所有比 main 新的本地分支建立 minor index，自動 checkout + stash</span><span class="en">Build a minor index for every local branch newer than main in one pass; auto checkout + stash</span></td>
+        </tr>
+        <tr>
+          <td><code>build_history</code></td>
+          <td><span class="zh">多個</span><span class="en">Multiple</span> <code>minor_*.db</code></td>
+          <td><span class="zh">對 first-parent 線性歷史的每個 commit 建立 minor（用於「任意 commit 搜尋」）</span><span class="en">Build a minor for every commit on the first-parent linear history (enables "search any commit")</span></td>
+        </tr>
+        <tr>
+          <td><code>build_promote</code></td>
+          <td><span class="zh">新版</span><span class="en">New</span> <code>main_&lt;ver&gt;.db</code></td>
+          <td><span class="zh">將某個 minor 合併進 main，產生新版本 main DB（壓縮分層）</span><span class="en">Merge a minor into main, producing a new main DB version (compress the tier)</span></td>
+        </tr>
+        <tr>
+          <td><code>cleanup</code></td>
+          <td><span class="zh">（刪除孤立 DB）</span><span class="en">(Removes orphaned DBs)</span></td>
+          <td><span class="zh">移除分支已消失但 minor DB 仍存在的孤立索引</span><span class="en">Remove orphaned minor DBs whose branches no longer exist</span></td>
+        </tr>
+        <tr>
+          <td><code>status</code></td>
+          <td><span class="zh">（顯示報告）</span><span class="en">(Displays report)</span></td>
+          <td><span class="zh">顯示所有 DB 的狀態、大小、commit SHA、新舊程度、搜尋模式</span><span class="en">Show status, size, commit SHA, age, and search mode for all DBs</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3><span class="zh">常用選項</span><span class="en">Common Options</span></h3>
+    <table>
+      <thead><tr><th><span class="zh">選項</span><span class="en">Option</span></th><th><span class="zh">說明</span><span class="en">Description</span></th></tr></thead>
+      <tbody>
+        <tr><td><code>--workers N</code></td><td><span class="zh">工作執行緒數（預設：CPU×2，上限 32）</span><span class="en">Worker thread count (default: CPU×2, max 32)</span></td></tr>
+        <tr><td><code>--hex</code></td><td><span class="zh">同時索引二進位檔的 16 進位內容（會增加 DB 大小）</span><span class="en">Also index binary file content as hex (increases DB size)</span></td></tr>
+        <tr><td><code>--db-dir &lt;path&gt;</code></td><td><span class="zh">將 DB 存放到指定目錄（與 repo 分離，例如 SSD）</span><span class="en">Store DBs in the specified directory (separate from repo, e.g. SSD)</span></td></tr>
+        <tr><td><code>--label &lt;ver&gt;</code></td><td><span class="zh">版本標籤，如 <code>v08</code> → <code>main_v08.db</code></span><span class="en">Version label, e.g. <code>v08</code> → <code>main_v08.db</code></span></td></tr>
+        <tr><td><code>--repo-dir &lt;path&gt;</code></td><td><span class="zh">指定 git repo 路徑（DB 與 repo 不在同一目錄時使用）</span><span class="en">Specify git repo path (use when DB and repo are in different directories)</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 6. 分層索引設計 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="tiered-index">
+    <div class="section-eyebrow">06 / tiered index design</div>
+    <h2><span class="zh">分層索引設計</span><span class="en">Tiered Index Design</span></h2>
+
+    <div class="zh"><p>
+      分層索引是 KVHSearch 最核心的設計，靈感來自 LSM-tree 和傳統備份的「完整備份 + 增量備份」概念。
+    </p></div>
+    <div class="en"><p>
+      Tiered indexing is KVHSearch's most central design, inspired by LSM-trees and
+      the classic backup concept of "full backup + incremental backup".
+    </p></div>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">── 版本化分層結構示意（帶 tombstone）</div>
+      <svg viewBox="0 0 700 260" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace;">
+        <!-- Main V07 -->
+        <rect x="20" y="20" width="155" height="220" rx="8" fill="#1a1200" stroke="#e3b341"/>
+        <text x="98" y="46" fill="#e3b341" text-anchor="middle" font-size="11" font-weight="600">Main_V07.db</text>
+        <text x="98" y="62" fill="#8b949e" text-anchor="middle" font-size="9">完整快照 @ v7 tag</text>
+        <line x1="20" y1="70" x2="175" y2="70" stroke="#e3b341" stroke-opacity="0.3"/>
+        <text x="35" y="88" fill="#c9d1d9" font-size="10">file_meta: 20,000 rows</text>
+        <text x="35" y="104" fill="#c9d1d9" font-size="10">file_content: FTS5</text>
+        <text x="35" y="120" fill="#c9d1d9" font-size="10">tombstones: (none)</text>
+        <text x="35" y="148" fill="#8b949e" font-size="9">base for:</text>
+        <text x="35" y="164" fill="#8b949e" font-size="9">minor_v07_01..09</text>
+
+        <!-- Arrow right -->
+        <line x1="177" y1="130" x2="208" y2="130" stroke="#30363d" stroke-width="1.5"/>
+        <polygon points="206,126 214,130 206,134" fill="#30363d"/>
+        <text x="193" y="122" fill="#8b949e" font-size="8" text-anchor="middle">diff</text>
+
+        <!-- Minor V07_01 -->
+        <rect x="210" y="80" width="125" height="100" rx="6" fill="#0d1f38" stroke="#1f6feb"/>
+        <text x="273" y="100" fill="#58a6ff" text-anchor="middle" font-size="10" font-weight="600">Minor_v07_01.db</text>
+        <line x1="210" y1="108" x2="335" y2="108" stroke="#1f6feb" stroke-opacity="0.3"/>
+        <text x="220" y="124" fill="#c9d1d9" font-size="9">modified: 45 files</text>
+        <text x="220" y="138" fill="#c9d1d9" font-size="9">added:    12 files</text>
+        <text x="220" y="152" fill="#f85149" font-size="9">tombstone: 3 paths</text>
+        <text x="220" y="170" fill="#8b949e" font-size="9">base_sha: &lt;V07 HEAD&gt;</text>
+
+        <!-- Minor V07_05 (dots implied) -->
+        <text x="340" y="130" fill="#8b949e" font-size="18" text-anchor="middle">···</text>
+
+        <!-- Minor V07_09 -->
+        <rect x="360" y="80" width="125" height="100" rx="6" fill="#0d1f38" stroke="#1f6feb"/>
+        <text x="423" y="100" fill="#58a6ff" text-anchor="middle" font-size="10" font-weight="600">Minor_v07_09.db</text>
+        <line x1="360" y1="108" x2="485" y2="108" stroke="#1f6feb" stroke-opacity="0.3"/>
+        <text x="370" y="124" fill="#c9d1d9" font-size="9">modified: 210 files</text>
+        <text x="370" y="138" fill="#c9d1d9" font-size="9">added:    55 files</text>
+        <text x="370" y="152" fill="#f85149" font-size="9">tombstone: 18 paths</text>
+        <text x="370" y="170" fill="#8b949e" font-size="9">base_sha: &lt;V07 HEAD&gt;</text>
+
+        <!-- promote arrow -->
+        <line x1="487" y1="130" x2="518" y2="130" stroke="#bc8cff" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <polygon points="516,126 524,130 516,134" fill="#bc8cff"/>
+        <text x="503" y="122" fill="#bc8cff" font-size="8" text-anchor="middle">promote</text>
+
+        <!-- Main V08 -->
+        <rect x="520" y="20" width="155" height="220" rx="8" fill="#1a1200" stroke="#e3b341"/>
+        <text x="598" y="46" fill="#e3b341" text-anchor="middle" font-size="11" font-weight="600">Main_V08.db</text>
+        <text x="598" y="62" fill="#8b949e" text-anchor="middle" font-size="9">完整快照 @ v8 tag</text>
+        <line x1="520" y1="70" x2="675" y2="70" stroke="#e3b341" stroke-opacity="0.3"/>
+        <text x="535" y="88" fill="#c9d1d9" font-size="10">file_meta: 20,055 rows</text>
+        <text x="535" y="104" fill="#c9d1d9" font-size="10">file_content: FTS5</text>
+        <text x="535" y="120" fill="#c9d1d9" font-size="10">（V07 minor 已壓縮）</text>
+
+        <!-- Search merge hint -->
+        <text x="350" y="220" fill="#8b949e" text-anchor="middle" font-size="9">搜尋時：Minor 結果優先，tombstone 過濾 Main 結果，後 Minor 壓制前 Minor</text>
+        <text x="350" y="235" fill="#8b949e" text-anchor="middle" font-size="9">（後者勝出原則）</text>
+      </svg>
+    </div>
+
+    <h3><span class="zh">Tombstone（刪除標記）機制</span><span class="en">Tombstone (Deletion Marker) Mechanism</span></h3>
+    <div class="zh"><p>
+      當 git diff 顯示某檔案被刪除（status = <code>D</code>）或重新命名（status = <code>R</code> 的舊路徑），
+      該路徑會被寫入 minor DB 的 <code>tombstones</code> 表。
+      搜尋時，<code>_run_query()</code> 會用 tombstone set 過濾掉 main 查詢結果中的對應記錄。
+    </p></div>
+    <div class="en"><p>
+      When <code>git diff</code> shows a file deleted (status <code>D</code>) or renamed
+      (the old path of status <code>R</code>), that path is written to the minor DB's
+      <code>tombstones</code> table. At search time, <code>_run_query()</code> uses the
+      tombstone set to suppress matching records from the main results.
+    </p></div>
+
+    <div class="callout warn">
+      <div class="icon">⚠️</div>
+      <div class="body">
+        <span class="zh"><strong>重要：Minor 是以 Main 為基準的完整差量</strong>
+        Minor_v07_05 包含的是「從 V07 base 到 minor_05 HEAD 的所有差異」，
+        不是「minor_04 到 minor_05」的一步差異。
+        這意味著每次只需合併 <strong>Main + 當前 Minor</strong>，不需要疊加多個 minor。</span>
+        <span class="en"><strong>Important: Each Minor is a full delta relative to Main</strong>
+        Minor_v07_05 contains "all differences from the V07 base to minor_05 HEAD",
+        not just the one-step delta from minor_04 to minor_05.
+        This means only <strong>Main + current Minor</strong> need to be merged—no stacking of multiple minors.</span>
+      </div>
+    </div>
+  </section>
+  
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- X. 變更偵測策略 -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="change-detect">
+  <div class="section-eyebrow">X / change detection</div>
+  <h2><span class="zh">變更偵測策略</span><span class="en">Change Detection Strategy</span></h2>
+
+  <div class="zh"><p>
+    在索引建立過程中，<code>_process_file()</code> 並非對所有檔案一律重新讀取與重建索引，
+    而是採用 <strong>由快到慢的三層變更偵測策略</strong>，
+    盡可能在最早階段判定「檔案未變更」並直接跳過，
+    以大幅降低磁碟 IO 與 CPU 計算成本。
+  </p></div>
+  <div class="en"><p>
+    During index building, <code>_process_file()</code> does not unconditionally re-read
+    and re-index every file. Instead it applies a <strong>three-tier change-detection
+    strategy (fast→slow)</strong>, determining "file unchanged" as early as possible and
+    skipping immediately to minimise disk I/O and CPU cost.
+  </p></div>
+
+    <h3><span class="zh">三層偵測順序（由快至慢）</span><span class="en">Three-tier Detection Order (Fast to Slow)</span></h3>
+
+  <ul class="step-list">
+    <div class="step">
+      <div class="step-body">
+        <span class="zh"><strong>① Git Blob SHA 比對（零讀檔）</strong>
+        對於 git tracked 的檔案，優先透過
+        <code>git ls-files -s</code> 取得的 blob SHA1 與
+        DB 中儲存的 <code>blob_sha</code> 進行比對。
+        若 SHA 相同，代表檔案內容完全一致，
+        可直接判定為「未變更」，不需讀取檔案本體。</span>
+        <span class="en"><strong>① Git Blob SHA Compare (zero file reads)</strong>
+        For git-tracked files, the blob SHA1 from <code>git ls-files -s</code> is
+        compared against the stored <code>blob_sha</code> in the DB.
+        An identical SHA means the file content is unchanged—skip immediately,
+        no file body read required.</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-body">
+        <span class="zh"><strong>② mtime 修改時間比對（metadata only）</strong>
+        若檔案未被 git 追蹤，則使用檔案系統的
+        <code>mtime</code> 與前次索引紀錄比較。
+        當時間差小於安全閾值（例如 &lt; 0.01 秒），
+        視為未變更，避免不必要的內容讀取。</span>
+        <span class="en"><strong>② mtime Modification-time Compare (metadata only)</strong>
+        For untracked files, the filesystem <code>mtime</code> is compared against the
+        previously recorded value. If the difference is below the safety threshold
+        (e.g. &lt; 0.01 s), the file is considered unchanged—no content read needed.</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-body">
+        <span class="zh"><strong>③ BLAKE2b 雜湊比對（完整讀檔）</strong>
+        僅在前兩層無法確認時，
+        才讀取完整檔案並計算
+        <code>BLAKE2b(digest_size=20)</code> 雜湊。
+        若雜湊一致，代表內容實際未改變；
+        否則視為修改或新增，進行索引更新。</span>
+        <span class="en"><strong>③ BLAKE2b Hash Compare (full file read)</strong>
+        Only when the first two tiers are inconclusive is the full file read and
+        <code>BLAKE2b(digest_size=20)</code> computed.
+        An identical digest means content is truly unchanged; otherwise the file
+        is treated as modified or new and the index is updated.</span>
+      </div>
+    </div>
+  </ul>
+
+  <div class="callout info">
+    <div class="icon">⚡</div>
+    <div class="body">
+      <span class="zh"><strong>效能效果</strong>
+      在實際大型 Git 倉庫中，
+      多數日常 build 僅有少量檔案變更，
+      三層策略通常可跳過 <strong>95% 以上的檔案</strong>，
+      使增量索引時間從分鐘級縮短至數秒。</span>
+      <span class="en"><strong>Performance Impact</strong>
+      In real large Git repositories, most daily builds change only a handful of files.
+      The three-tier strategy typically skips <strong>95%+ of files</strong>,
+      reducing incremental index time from minutes to seconds.</span>
+    </div>
+  </div>
+
+  </div>
+
+</section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 7. 搜尋模式選擇 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="search-mode">
+    <div class="section-eyebrow">07 / search mode</div>
+    <h2><span class="zh">搜尋模式自動選擇</span><span class="en">Automatic Search Mode</span></h2>
+
+    <div class="zh"><p>
+      <code>_get_active_conns()</code> 在每次搜尋前自動偵測環境，回傳
+      <code>(primary_conn, secondary_conn_or_None, tombstone_set)</code>。
+    </p></div>
+    <div class="en"><p>
+      Before every search, <code>_get_active_conns()</code> auto-detects the environment
+      and returns <code>(primary_conn, secondary_conn_or_None, tombstone_set)</code>.
+    </p></div>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">── _get_active_conns() 決策流程</div>
+      <svg viewBox="0 0 700 360" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace;">
+        <defs>
+          <marker id="arr4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+          </marker>
+          <marker id="arr4r" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#f85149"/>
+          </marker>
+        </defs>
+
+        <!-- Start -->
+        <rect x="280" y="10" width="140" height="34" rx="17" fill="#0d1f38" stroke="#58a6ff"/>
+        <text x="350" y="32" fill="#79c0ff" text-anchor="middle" font-size="12">開始搜尋</text>
+
+        <!-- D1 -->
+        <line x1="350" y1="44" x2="350" y2="70" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr4)"/>
+        <rect x="220" y="70" width="260" height="36" rx="6" fill="#1d2d3e" stroke="#58a6ff"/>
+        <text x="350" y="93" fill="#c9d1d9" text-anchor="middle" font-size="11">main_index.db 存在？</text>
+
+        <!-- No → legacy -->
+        <line x1="480" y1="88" x2="580" y2="88" stroke="#f85149" stroke-width="1.5" marker-end="url(#arr4r)"/>
+        <text x="530" y="82" fill="#f85149" font-size="10" text-anchor="middle">否</text>
+        <rect x="580" y="72" width="110" height="32" rx="6" fill="#2d1118" stroke="#f85149"/>
+        <text x="635" y="92" fill="#f85149" text-anchor="middle" font-size="10">Legacy 模式</text>
+        <text x="635" y="110" fill="#8b949e" text-anchor="middle" font-size="9">file_index.db</text>
+
+        <!-- Yes -->
+        <line x1="350" y1="106" x2="350" y2="140" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr4)"/>
+        <text x="358" y="128" fill="#3fb950" font-size="10">是</text>
+
+        <!-- D2 -->
+        <rect x="180" y="140" width="340" height="36" rx="6" fill="#1d2d3e" stroke="#58a6ff"/>
+        <text x="350" y="163" fill="#c9d1d9" text-anchor="middle" font-size="11">目前分支 HEAD 對應的 minor_&lt;sha&gt;.db 存在？</text>
+
+        <!-- No: check auto-build -->
+        <line x1="350" y1="176" x2="350" y2="210" stroke="#f85149" stroke-width="1.5" marker-end="url(#arr4r)"/>
+        <text x="358" y="198" fill="#f85149" font-size="10">否</text>
+        <rect x="190" y="210" width="320" height="36" rx="6" fill="#1d2d3e" stroke="#e3b341"/>
+        <text x="350" y="233" fill="#e3b341" text-anchor="middle" font-size="11">commits ahead ≤ AUTO_BUILD_THRESHOLD (20)?</text>
+
+        <!-- auto-build yes -->
+        <line x1="190" y1="228" x2="120" y2="228" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr4)"/>
+        <text x="155" y="220" fill="#3fb950" font-size="10" text-anchor="middle">是</text>
+        <rect x="20" y="212" width="98" height="32" rx="6" fill="#0d2218" stroke="#3fb950"/>
+        <text x="69" y="232" fill="#3fb950" text-anchor="middle" font-size="10">自動 build_minor</text>
+
+        <!-- auto-build fallthrough -->
+        <line x1="69" y1="244" x2="69" y2="270" stroke="#3fb950" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="69" y="262" fill="#8b949e" font-size="9" text-anchor="middle">重試</text>
+
+        <!-- Main-only fallback -->
+        <line x1="350" y1="246" x2="350" y2="280" stroke="#f85149" stroke-width="1.5" marker-end="url(#arr4r)"/>
+        <text x="358" y="268" fill="#f85149" font-size="10">否/失敗</text>
+        <rect x="220" y="280" width="260" height="32" rx="6" fill="#2d1118" stroke="#f85149"/>
+        <text x="350" y="301" fill="#f85149" text-anchor="middle" font-size="11">Main-only 模式 + 警告</text>
+
+        <!-- D2 Yes: Tiered -->
+        <line x1="522" y1="158" x2="600" y2="158" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr4)"/>
+        <text x="561" y="150" fill="#3fb950" font-size="10" text-anchor="middle">是</text>
+        <rect x="600" y="140" width="90" height="36" rx="6" fill="#0d2218" stroke="#3fb950"/>
+        <text x="645" y="162" fill="#3fb950" text-anchor="middle" font-size="11">Tiered 模式</text>
+
+        <!-- Tiered detail -->
+        <text x="645" y="194" fill="#8b949e" text-anchor="middle" font-size="9">primary = minor</text>
+        <text x="645" y="208" fill="#8b949e" text-anchor="middle" font-size="9">secondary = main</text>
+        <text x="645" y="222" fill="#8b949e" text-anchor="middle" font-size="9">tombstones ← minor DB</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 8. 搜尋類型 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="search-types">
+    <div class="section-eyebrow">08 / search types</div>
+    <h2><span class="zh">搜尋類型</span><span class="en">Search Types</span></h2>
+
+    <table>
+      <thead>
+        <tr><th><span class="zh">指令</span><span class="en">Command</span></th><th><span class="zh">函式</span><span class="en">Function</span></th><th>SQL / <span class="zh">演算法</span><span class="en">Algorithm</span></th><th><span class="zh">速度</span><span class="en">Speed</span></th><th><span class="zh">說明</span><span class="en">Description</span></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>search</code></td>
+          <td><code>search_exact()</code></td>
+          <td><code>file_content MATCH "kw1" "kw2"</code></td>
+          <td><span class="badge green">最快</span></td>
+          <td><span class="zh">AND 邏輯，所有關鍵字必須同時出現，FTS5 原生支援</span><span class="en">AND logic — all keywords must appear; native FTS5 support</span></td>
+        </tr>
+        <tr>
+          <td><code>prefix</code></td>
+          <td><code>search_prefix()</code></td>
+          <td><code>MATCH "prefix"*</code></td>
+          <td><span class="badge green">快</span></td>
+          <td><span class="zh">字首比對，FTS5 原生前綴查詢</span><span class="en">Prefix match; native FTS5 prefix query</span></td>
+        </tr>
+        <tr>
+          <td><code>substr</code></td>
+          <td><code>search_substr()</code></td>
+          <td><span class="zh">≥3字元用 FTS5 MATCH；&lt;3字元退回 LIKE</span><span class="en">≥3 chars: FTS5 MATCH; &lt;3 chars: falls back to LIKE</span></td>
+          <td><span class="badge blue">快/中</span></td>
+          <td><span class="zh">任意位置子字串，≥3 字元透過 Trigram 加速</span><span class="en">Substring at any position; ≥3 chars accelerated by Trigram</span></td>
+        </tr>
+        <tr>
+          <td><code>glob</code></td>
+          <td><code>search_glob()</code></td>
+          <td>FTS5 literal AND pre-filter + regex verify per line</td>
+          <td><span class="badge blue">中</span></td>
+          <td><span class="zh">萬用字元搜尋，支援 <code>*</code>（任意序列）、<code>?</code>（單字元）、<code>[...]</code>（字元類別）；二階段：FTS5 縮小候選集後逐行 regex 驗證</span><span class="en">Wildcard search supporting <code>*</code> (any sequence), <code>?</code> (single char), <code>[...]</code> (char class); two-phase: FTS5 narrows candidates then per-line regex verify</span></td>
+        </tr>
+        <tr>
+          <td><code>fuzzy</code></td>
+          <td><code>search_fuzzy()</code></td>
+          <td>deletion + substitution variants + FTS5 OR MATCH; Pigeonhole for dist≥2; <span class="zh">C 複合運算式結構驗證</span><span class="en">C compound expression structural verification</span></td>
+          <td><span class="badge yellow">中</span></td>
+          <td><span class="zh">拼字容錯；dist=1 展開刪除 + 替換；dist≥2 加 Pigeonhole 分段；支援 A-&gt;B、A.B、A(B) 複合運算式搜尋</span><span class="en">Spelling tolerance; dist=1 expands deletion + substitution; dist≥2 adds Pigeonhole segmentation; supports A-&gt;B, A.B, A(B) compound expression search</span></td>
+        </tr>
+        <tr style="opacity:0.45;">
+          <td><code>hex</code> <span style="color:var(--text2);font-size:11px;">&#8230;</span></td>
+          <td><code>search_hex()</code></td>
+          <td><code>MATCH "DEADBEEF"</code>（需 --hex 建立）</td>
+          <td><span class="badge gray">暂不支援</span></td>
+          <td>二進位內容搜尋，以 4-byte 滑動視窗 token 索引。<em style="color:var(--text2);">&#8230; hidden, not yet supported in GUI</em></td>
+        </tr>
+        <tr style="opacity:0.45;">
+          <td><code>ext</code> <span style="color:var(--text2);font-size:11px;">&#8230;</span></td>
+          <td><code>search_ext()</code></td>
+          <td><code>WHERE ext IN (...)</code>（file_meta 索引）</td>
+          <td><span class="badge gray">暂不支援</span></td>
+          <td>列出指定副檔名或 Profile 的所有檔案，不需 FTS5。<em style="color:var(--text2);">&#8230; hidden, not yet supported in GUI</em></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3><span class="zh">Fuzzy 演算法詳解（刪除 + 替換展開）</span><span class="en">Fuzzy Algorithm (Deletion + Substitution)</span></h3>
+    <div class="zh"><p>
+      <code>_fuzzy_variants_dist1()</code> 在 dist=1 時同時展開<strong>刪除（Deletion）</strong>與<strong>替換（Substitution）</strong>兩種鄰域；
+      dist≥2 時 <code>_pigeonhole_parts()</code> 以鴿巢原理分段，再透過 <code>_bk_tree_fuzzy()</code>
+      以 FTS5 <code>OR</code> MATCH 批次查詢；最後 Phase 2 由 <code>_scan_lines_fuzzy()</code> 以
+      <code>_levenshtein()</code> 逐行精確驗證。
+    </p></div>
+    <div class="en"><p>
+      At dist=1, <code>_fuzzy_variants_dist1()</code> expands both
+      <strong>Deletion</strong> and <strong>Substitution</strong> neighbourhoods.
+      At dist≥2, <code>_pigeonhole_parts()</code> segments the keyword via the Pigeonhole
+      principle; <code>_bk_tree_fuzzy()</code> then batch-queries with FTS5 <code>OR</code>
+      MATCH; Phase 2 uses <code>_scan_lines_fuzzy()</code> + <code>_levenshtein()</code>
+      for exact per-line verification.
+    </p></div>
+
+    <pre><code><span class="cm"># 範例：keyword="OemDxe", max_dist=1</span>
+<span class="cm"># 刪除集合（6 個）：</span>
+<span class="cm"># "emDxe", "OmDxe", "OeDxe", "Oemxe", "OemDe", "OemDx"</span>
+<span class="cm"># 替換集合（每位置 × _FUZZY_ALPHABET 36 字元）：</span>
+<span class="cm"># "AemDxe", "BemDxe", ..., "OemDxa", "OemDxb", ...</span>
+<span class="cm"># → 合入 FTS5 MATCH 的 OR 查詢，只保留長度 ≥ 3 的候選詞</span>
+<span class="cm"># Phase 2：_scan_lines_fuzzy() 以 _levenshtein() 驗證每行各 token</span>
+</code></pre>
+
+    <h3><span class="zh">Pigeonhole 分段策略（dist ≥ 2）</span><span class="en">Pigeonhole Segmentation (dist ≥ 2)</span></h3>
+    <div class="zh"><p>
+      <code>_pigeonhole_parts()</code> 將關鍵字切成 <em>d+1</em> 個等段。
+      根據鴿巢原理，若 edit_distance(query, target) ≤ d，則至少有一段原封不動出現在 target，
+      可直接作為 FTS5 子字串過濾，大幅縮小候選集後再交 Levenshtein 精確驗證。
+    </p></div>
+    <div class="en"><p>
+      <code>_pigeonhole_parts()</code> splits the keyword into <em>d+1</em> equal segments.
+      By the Pigeonhole principle, if edit_distance(query, target) ≤ d, at least one segment
+      must appear verbatim in the target—that segment is used as a FTS5 substring filter to
+      shrink the candidate set before Levenshtein exact verification.
+    </p></div>
+
+    <h3><span class="zh">複合 C 運算式解析</span><span class="en">Compound C Expression Parsing</span></h3>
+    <div class="zh"><p>
+      <code>search_fuzzy()</code> 支援直接輸入 C 複合運算式作為關鍵字。
+      <code>_parse_structure()</code> 解析 <code>-&gt;</code>、<code>.</code>、<code>(</code> 分隔符，
+      拆出識別符 parts 與結構 constraints；Phase 2 的 <code>_scan_lines_fuzzy()</code>
+      同時驗證 Levenshtein 距離<strong>與</strong>結構順序（<code>_constraint_to_regex()</code>）。
+    </p></div>
+    <div class="en"><p>
+      <code>search_fuzzy()</code> accepts C compound expressions directly as the keyword.
+      <code>_parse_structure()</code> splits on <code>-&gt;</code>, <code>.</code>, <code>(</code>
+      separators to extract identifier parts and structural constraints; Phase 2's
+      <code>_scan_lines_fuzzy()</code> verifies both Levenshtein distance
+      <strong>and</strong> structural order (<code>_constraint_to_regex()</code>).
+    </p></div>
+
+    <pre><code><span class="cm"># 複合運算式範例</span>
+python Search_cli.py fuzzy <span class="st">"gProtocol-&gt;IsSupported"</span> 1
+<span class="cm"># → parts: ['gProtocol', 'IsSupported']</span>
+<span class="cm"># → constraint: ('gProtocol', '-&gt;', 'IsSupported')</span>
+<span class="cm"># 只輸出同時 fuzzy 命中兩個 token 且 '-&gt;' 結構正確的行</span>
+
+python Search_cli.py fuzzy <span class="st">"PcdGet32(PcdDebugLevel)"</span> 1
+<span class="cm"># → parts: ['PcdGet32', 'PcdDebugLevel']</span>
+<span class="cm"># → constraint: ('PcdGet32', '(', 'PcdDebugLevel')</span>
+</code></pre>
+
+    <div class="callout info">
+      <div class="icon">💡</div>
+      <div class="body">
+        <span class="zh"><strong>Fuzzy 目前的限制</strong>
+        支援刪除與替換（dist=1 展開）；不支援插入或轉置。
+        dist=2 以上藉 Pigeonhole 加速候選集縮減，Phase 2 用標準 Levenshtein 驗證，
+        所有 ≤ max_dist 的編輯距離皆能正確覆蓋。</span>
+        <span class="en"><strong>Current Fuzzy Limitations</strong>
+        Supports deletion and substitution (dist=1 expansion); insertion and transposition
+        are not supported. For dist≥2, Pigeonhole accelerates candidate reduction;
+        Phase 2 uses standard Levenshtein—all edit distances ≤ max_dist are correctly covered.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 9. 搜尋篩選器 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="search-filters">
+    <div class="section-eyebrow">09 / search filters</div>
+    <h2><span class="zh">搜尋結果篩選器</span><span class="en">Search Filters</span></h2>
+
+    <div class="zh"><p>
+      篩選器在 FTS5 查詢<strong>之後</strong>（post-query filtering）由 <code>_apply_search_filters()</code> 套用，
+      四種篩選器可以任意組合，均為大小寫不敏感。
+    </p></div>
+    <div class="en"><p>
+      Filters are applied <strong>after</strong> the FTS5 query (post-query filtering) by
+      <code>_apply_search_filters()</code>. All four filters can be combined freely and
+      are case-insensitive.
+    </p></div>
+
+    <table>
+      <thead>
+        <tr><th><span class="zh">選項</span><span class="en">Option</span></th><th><span class="zh">類型</span><span class="en">Type</span></th><th><span class="zh">邏輯</span><span class="en">Logic</span></th><th><span class="zh">範例</span><span class="en">Example</span></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>--ext .c .h</code></td>
+          <td><span class="zh">副檔名白名單</span><span class="en">Extension whitelist</span></td>
+          <td><span class="zh">AND（路徑的 suffix 必須在列表中）</span><span class="en">AND (path suffix must be in list)</span></td>
+          <td><span class="zh">只顯示 C 原始碼和標頭檔</span><span class="en">Show only C source and header files</span></td>
+        </tr>
+        <tr>
+          <td><code>--path LenovoWsPkg</code></td>
+          <td><span class="zh">路徑子字串</span><span class="en">Path substring</span></td>
+          <td><span class="zh">OR（路徑包含任一字串）</span><span class="en">OR (path contains any string)</span></td>
+          <td><span class="zh">只顯示 LenovoWsPkg 路徑下的結果</span><span class="en">Show only results under LenovoWsPkg</span></td>
+        </tr>
+        <tr>
+          <td><code>--exclude *.inf</code></td>
+          <td><span class="zh">glob 排除</span><span class="en">glob exclusion</span></td>
+          <td><span class="zh">OR（符合任一 glob 就排除）</span><span class="en">OR (exclude if matches any glob)</span></td>
+          <td><span class="zh">排除所有 .inf 和 .sdl 檔案</span><span class="en">Exclude all .inf and .sdl files</span></td>
+        </tr>
+        <tr>
+          <td><code>--grep EFI_STATUS</code></td>
+          <td><span class="zh">行內容過濾</span><span class="en">Line content filter</span></td>
+          <td><span class="zh">AND（行必須同時包含所有 grep 詞）</span><span class="en">AND (line must contain all grep terms)</span></td>
+          <td><span class="zh">只顯示同時含 EFI_STATUS 的行</span><span class="en">Show only lines also containing EFI_STATUS</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="zh"><p>此外，<code>--txt</code> / <code>--bin</code> 會在 SQL 層加入 <code>AND m.is_text = 1/0</code>，
+    比 post-query 更早過濾，效能更好。</p></div>
+    <div class="en"><p>Additionally, <code>--txt</code> / <code>--bin</code> injects <code>AND m.is_text = 1/0</code>
+    at the SQL layer—earlier than post-query filtering—for better performance.</p></div>
+
+    <h3><span class="zh">副檔名 Profile（build_index_profiles.json）</span><span class="en">Extension Profile (build_index_profiles.json)</span></h3>
+    <div class="zh"><p>
+      <code>--ext c</code>（Profile 名稱）會自動展開為 <code>.c .cpp .h .hpp</code>，
+      讓常用的副檔名組合只需一個短名稱。Profile 可在 JSON 設定檔中自訂：
+    </p></div>
+    <div class="en"><p>
+      <code>--ext c</code> (a Profile name) automatically expands to <code>.c .cpp .h .hpp</code>,
+      so common extension groups need only a short name. Profiles are fully customisable
+      in the JSON config file:
+    </p></div>
+
+    <pre><code><span class="cm">// build_index_profiles.json（可自行新增/修改）</span>
+{
+  <span class="st">"c"</span>:   [<span class="st">".c"</span>, <span class="st">".cpp"</span>, <span class="st">".h"</span>, <span class="st">".hpp"</span>],
+  <span class="st">"py"</span>:  [<span class="st">".py"</span>],
+  <span class="st">"inf"</span>: [<span class="st">".inf"</span>],
+  <span class="st">"bin"</span>: [<span class="st">".bin"</span>, <span class="st">".rom"</span>, <span class="st">".efi"</span>, <span class="st">".fd"</span>],
+  <span class="st">"all"</span>: [],   <span class="cm">// 空陣列 = 不過濾副檔名</span>
+
+  <span class="st">"skip"</span>: {    <span class="cm">// 建立索引時排除的規則</span>
+    <span class="st">"max_file_mb"</span>: <span class="nu">64</span>,
+    <span class="st">"folders"</span>: [<span class="st">".git"</span>, <span class="st">"build"</span>, <span class="st">"node_modules"</span>],
+    <span class="st">"extensions"</span>: [<span class="st">".exe"</span>, <span class="st">".dll"</span>, <span class="st">".pdf"</span>],
+    <span class="st">"patterns"</span>: [<span class="st">"iasl*.*"</span>]
+  }
+}</code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 10. 合併邏輯 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="merge-logic">
+    <div class="section-eyebrow">10 / merge logic</div>
+    <h2><span class="zh">Tiered 合併邏輯</span><span class="en">Tiered Merge Logic</span></h2>
+
+    <div class="zh"><p>
+      <code>_run_query()</code> 實作 Minor 與 Main 結果的合併，規則如下：
+    </p></div>
+    <div class="en"><p>
+      <code>_run_query()</code> implements the merge of Minor and Main results
+      according to the following rules:
+    </p></div>
+
+    <pre><code><span class="kw">def</span> <span class="fn">_run_query</span>(primary, secondary, tombstones, sql, params):
+    rows = primary.execute(sql, params).fetchall()   <span class="cm"># minor 結果</span>
+    <span class="kw">if</span> secondary:
+        seen = {r[<span class="nu">0</span>] <span class="kw">for</span> r <span class="kw">in</span> rows}             <span class="cm"># minor 中已有的 path</span>
+        <span class="kw">for</span> r <span class="kw">in</span> secondary.execute(sql, params).fetchall():
+            <span class="kw">if</span> r[<span class="nu">0</span>] <span class="kw">not in</span> tombstones <span class="kw">and</span> r[<span class="nu">0</span>] <span class="kw">not in</span> seen:
+                rows.append(r)                       <span class="cm"># 補充 main 的獨有結果</span>
+    <span class="kw">return</span> rows</code></pre>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">── 結果合併的三種情況</div>
+      <svg viewBox="0 0 700 160" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace;">
+        <!-- Case 1 -->
+        <rect x="10" y="20" width="210" height="120" rx="8" fill="#0d2218" stroke="#3fb950"/>
+        <text x="115" y="42" fill="#3fb950" text-anchor="middle" font-size="11" font-weight="600">Case 1：Minor 有此路徑</text>
+        <text x="115" y="62" fill="#c9d1d9" text-anchor="middle" font-size="10">minor 結果直接保留</text>
+        <text x="115" y="78" fill="#c9d1d9" text-anchor="middle" font-size="10">main 同路徑結果被 seen set 擋住</text>
+        <text x="115" y="96" fill="#3fb950" text-anchor="middle" font-size="10">→ 顯示 minor 版本（最新）</text>
+        <text x="115" y="112" fill="#8b949e" text-anchor="middle" font-size="9">適用：修改過的檔案</text>
+
+        <!-- Case 2 -->
+        <rect x="242" y="20" width="210" height="120" rx="8" fill="#2d1118" stroke="#f85149"/>
+        <text x="347" y="42" fill="#f85149" text-anchor="middle" font-size="11" font-weight="600">Case 2：Tombstone 路徑</text>
+        <text x="347" y="62" fill="#c9d1d9" text-anchor="middle" font-size="10">minor 中無此路徑（已刪除）</text>
+        <text x="347" y="78" fill="#c9d1d9" text-anchor="middle" font-size="10">main 有，但在 tombstone set 中</text>
+        <text x="347" y="96" fill="#f85149" text-anchor="middle" font-size="10">→ 完全不顯示（抑制）</text>
+        <text x="347" y="112" fill="#8b949e" text-anchor="middle" font-size="9">適用：已刪除 / 重新命名的檔案</text>
+
+        <!-- Case 3 -->
+        <rect x="474" y="20" width="210" height="120" rx="8" fill="#0d1f38" stroke="#58a6ff"/>
+        <text x="579" y="42" fill="#58a6ff" text-anchor="middle" font-size="11" font-weight="600">Case 3：Main 獨有路徑</text>
+        <text x="579" y="62" fill="#c9d1d9" text-anchor="middle" font-size="10">minor 中無此路徑</text>
+        <text x="579" y="78" fill="#c9d1d9" text-anchor="middle" font-size="10">main 有，且不在 tombstone 中</text>
+        <text x="579" y="96" fill="#58a6ff" text-anchor="middle" font-size="10">→ 顯示 main 版本</text>
+        <text x="579" y="112" fill="#8b949e" text-anchor="middle" font-size="9">適用：未修改的舊檔案</text>
+      </svg>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 11. 流程圖 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="flowcharts">
+    <div class="section-eyebrow">11 / flowcharts</div>
+    <h2><span class="zh">流程圖</span><span class="en">Flowcharts</span></h2>
+
+    <h3><span class="zh">build_chain 完整流程</span><span class="en">build_chain Full Flow</span></h3>
+    <div class="diagram-wrap">
+      <div class="diagram-title">── build_chain() 執行步驟</div>
+      <svg viewBox="0 0 700 520" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace;">
+        <defs>
+          <marker id="arr5" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+          </marker>
+        </defs>
+
+        <rect x="250" y="10" width="200" height="32" rx="16" fill="#0d1f38" stroke="#58a6ff"/>
+        <text x="350" y="31" fill="#79c0ff" text-anchor="middle" font-size="12">build_chain 啟動</text>
+
+        <line x1="350" y1="42" x2="350" y2="66" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr5)"/>
+
+        <rect x="190" y="66" width="320" height="32" rx="6" fill="#1d2d3e" stroke="#58a6ff"/>
+        <text x="350" y="87" fill="#c9d1d9" text-anchor="middle" font-size="11">main_index.db 存在 + 有 last_commit？</text>
+
+        <line x1="512" y1="82" x2="580" y2="82" stroke="#f85149" stroke-width="1.5" marker-end="url(#arr5)"/>
+        <text x="546" y="76" fill="#f85149" font-size="10" text-anchor="middle">否</text>
+        <text x="640" y="87" fill="#f85149" text-anchor="middle" font-size="11">ERROR 退出</text>
+
+        <line x1="350" y1="98" x2="350" y2="124" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arr5)"/>
+        <text x="358" y="116" fill="#3fb950" font-size="10">是</text>
+
+        <rect x="180" y="124" width="340" height="32" rx="6" fill="#1d2d3e" stroke="#58a6ff"/>
+        <text x="350" y="145" fill="#c9d1d9" text-anchor="middle" font-size="11">git branch --sort=-committerdate 取得分支清單</text>
+
+        <line x1="350" y1="156" x2="350" y2="180" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr5)"/>
+
+        <rect x="180" y="180" width="340" height="32" rx="6" fill="#1d2d3e" stroke="#58a6ff"/>
+        <text x="350" y="201" fill="#c9d1d9" text-anchor="middle" font-size="11">過濾：比 main base commit 更新的分支</text>
+
+        <line x1="350" y1="212" x2="350" y2="236" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr5)"/>
+
+        <rect x="190" y="236" width="320" height="32" rx="6" fill="#1d2d3e" stroke="#e3b341"/>
+        <text x="350" y="257" fill="#e3b341" text-anchor="middle" font-size="11">顯示預覽 + 使用者確認 [y/N]</text>
+
+        <line x1="350" y1="268" x2="350" y2="290" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr5)"/>
+
+        <rect x="230" y="290" width="240" height="32" rx="6" fill="#0d2218" stroke="#3fb950"/>
+        <text x="350" y="311" fill="#3fb950" text-anchor="middle" font-size="11">工作區有變更？→ git stash</text>
+
+        <line x1="350" y1="322" x2="350" y2="344" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr5)"/>
+
+        <rect x="180" y="344" width="340" height="32" rx="6" fill="#2d2010" stroke="#f0883e"/>
+        <text x="350" y="365" fill="#f0883e" text-anchor="middle" font-size="11">for branch in to_build：git checkout → build_minor</text>
+
+        <line x1="350" y1="376" x2="350" y2="398" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr5)"/>
+
+        <rect x="210" y="398" width="280" height="32" rx="6" fill="#0d1f38" stroke="#58a6ff"/>
+        <text x="350" y="419" fill="#79c0ff" text-anchor="middle" font-size="11">finally：恢復原始分支 + git stash pop</text>
+
+        <line x1="350" y1="430" x2="350" y2="452" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr5)"/>
+
+        <rect x="250" y="452" width="200" height="32" rx="6" fill="#0d2218" stroke="#3fb950"/>
+        <text x="350" y="473" fill="#3fb950" text-anchor="middle" font-size="11">印出建立摘要報表</text>
+
+        <line x1="350" y1="484" x2="350" y2="506" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr5)"/>
+        <text x="350" y="516" fill="#8b949e" text-anchor="middle" font-size="10">完成</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 12. HEX 索引 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="hex-index" style="opacity:0.45;">
+    <div class="section-eyebrow">12 / hex indexing &nbsp;&#8230; <span style="font-size:11px;color:var(--text2);">hidden — not yet supported in GUI</span></div>
+    <h2><span class="zh">HEX 二進位索引</span><span class="en">HEX Binary Indexing</span></h2>
+
+    <div class="zh"><p>
+      啟用 <code>--hex</code> 後，<code>_extract_hex_tokens()</code> 會以
+      <strong>4-byte 滑動視窗（stride=1 byte）</strong> 將二進位資料編碼為大寫十六進位 token，
+      和 ASCII 字串內容合併存入 FTS5 <code>file_content</code> 欄位。
+    </p></div>
+    <div class="en"><p>
+      When <code>--hex</code> is enabled, <code>_extract_hex_tokens()</code> encodes
+      binary data as uppercase hex tokens using a <strong>4-byte sliding window (stride=1 byte)</strong>,
+      merging them with the ASCII string content into the FTS5 <code>file_content</code> column.
+    </p></div>
+
+    <div class="diagram-wrap">
+      <div class="diagram-title">── HEX Token 產生示意（chunk=4, stride=1）</div>
+      <svg viewBox="0 0 660 100" width="100%" xmlns="http://www.w3.org/2000/svg" style="font-family:'JetBrains Mono',monospace;">
+        <text x="20" y="28" fill="#8b949e" font-size="11">二進位位元組：</text>
+        <rect x="150" y="12" width="36" height="24" rx="4" fill="#162232" stroke="#1f6feb"/>
+        <text x="168" y="29" fill="#79c0ff" text-anchor="middle" font-size="12">DE</text>
+        <rect x="190" y="12" width="36" height="24" rx="4" fill="#162232" stroke="#1f6feb"/>
+        <text x="208" y="29" fill="#79c0ff" text-anchor="middle" font-size="12">AD</text>
+        <rect x="230" y="12" width="36" height="24" rx="4" fill="#162232" stroke="#1f6feb"/>
+        <text x="248" y="29" fill="#79c0ff" text-anchor="middle" font-size="12">BE</text>
+        <rect x="270" y="12" width="36" height="24" rx="4" fill="#162232" stroke="#1f6feb"/>
+        <text x="288" y="29" fill="#79c0ff" text-anchor="middle" font-size="12">EF</text>
+        <rect x="310" y="12" width="36" height="24" rx="4" fill="#162232" stroke="#1f6feb"/>
+        <text x="328" y="29" fill="#79c0ff" text-anchor="middle" font-size="12">00</text>
+
+        <text x="20" y="72" fill="#8b949e" font-size="11">輸出 tokens：</text>
+        <rect x="150" y="56" width="76" height="24" rx="4" fill="#0d2218" stroke="#3fb950"/>
+        <text x="188" y="73" fill="#3fb950" text-anchor="middle" font-size="11">DEADBEEF</text>
+        <rect x="234" y="56" width="76" height="24" rx="4" fill="#0d2218" stroke="#3fb950"/>
+        <text x="272" y="73" fill="#3fb950" text-anchor="middle" font-size="11">ADBEEF00</text>
+
+        <text x="322" y="72" fill="#8b949e" font-size="11">（stride=1 → 任意對齊都能命中）</text>
+      </svg>
+    </div>
+
+    <div class="callout warn">
+      <div class="icon">⚠️</div>
+      <div class="body">
+        <span class="zh"><strong>HEX 索引的代價</strong>
+        對大型二進位檔（.rom, .fd, .bin）啟用 HEX 索引會<strong>大幅增加 DB 大小</strong>：
+        1 MB 的二進位檔會產生約 1M 個 token。建議只對已知需要 hex 搜尋的二進位副檔名使用，
+        並在 skip rules 中將不需要的大型二進位檔排除。</span>
+        <span class="en"><strong>Cost of HEX Indexing</strong>
+        Enabling HEX indexing on large binary files (.rom, .fd, .bin) <strong>greatly inflates the DB size</strong>:
+        1 MB of binary produces ~1 million tokens. Only enable it for binary extensions known
+        to need hex search, and exclude large unwanted binaries in the skip rules.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 13. 自動建立 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="auto-build">
+    <div class="section-eyebrow">13 / auto-build</div>
+    <h2><span class="zh">自動建立 Minor Index</span><span class="en">Auto-build Minor Index</span></h2>
+
+    <div class="zh"><p>
+      預設值 <code>AUTO_BUILD_THRESHOLD = 20</code>：若目前分支領先 main base 不超過 20 個 commit，
+      搜尋時會自動觸發 <code>build_minor()</code>，無需手動執行。
+    </p></div>
+    <div class="en"><p>
+      Default <code>AUTO_BUILD_THRESHOLD = 20</code>: if the current branch is no more than
+      20 commits ahead of the main base, <code>build_minor()</code> is triggered automatically
+      at search time—no manual run needed.
+    </p></div>
+
+    <pre><code><span class="cm"># 在 kvhsearch_core.py 的最上層修改閾值</span>
+AUTO_BUILD_THRESHOLD: int = <span class="nu">20</span>   <span class="cm"># 0 = 停用自動建立</span></code></pre>
+
+    <div class="zh"><p>超過閾值或自動建立失敗時，系統退回 <strong>Main-only 模式</strong>並顯示黃色警告。
+    此設計是為了避免在 commits 很多時，自動建立花太多時間拖慢搜尋回應。</p></div>
+    <div class="en"><p>When the threshold is exceeded or auto-build fails, the system falls back to
+    <strong>Main-only mode</strong> and shows a yellow warning. This is intentional—preventing
+    auto-build from delaying search response when there are many commits ahead.</p></div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 14. 優點 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="benefits">
+    <div class="section-eyebrow">14 / benefits</div>
+    <h2><span class="zh">優點</span><span class="en">Benefits</span></h2>
+
+    <ul class="benefit-list">
+      <li><strong><span class="zh">完全離線，無需服務</span><span class="en">Fully Offline, No Services</span></strong>：<span class="zh">所有資料在本機 SQLite，不需網路、不需背景 daemon、不依賴 grep 或其他外部工具。</span><span class="en">All data in local SQLite. No network, no background daemon, no grep or external tools needed.</span></li>
+      <li><strong><span class="zh">毫秒級查詢速度</span><span class="en">Millisecond-level Queries</span></strong>：<span class="zh">FTS5 倒排索引讓 20,000 個檔案的精確搜尋典型在 10–50 ms 完成。</span><span class="en">FTS5 inverted index enables exact searches across 20,000 files typically in 10–50 ms.</span></li>
+      <li><strong><span class="zh">分層索引節省時間</span><span class="en">Tiered Index Saves Time</span></strong>：<span class="zh">Minor index 只含差量，在分支切換頻繁的開發環境中，重建時間從分鐘級降到秒級。</span><span class="en">Minor index holds only diffs. In fast-switching branch environments, rebuild time drops from minutes to seconds.</span></li>
+      <li><strong><span class="zh">三層跳過策略大幅加速重建</span><span class="en">Three-tier Skip Strategy Accelerates Rebuild</span></strong>：<span class="zh">git blob SHA 比對可對未修改的 tracked 檔案實現零讀檔，典型場景可跳過 95%+ 的檔案。</span><span class="en">Git blob SHA matching achieves zero file reads for unchanged tracked files. Typically skips 95%+ of files.</span></li>
+      <li><strong><span class="zh">多執行緒並行</span><span class="en">Multi-threaded Parallel</span></strong>：<span class="zh">ThreadPoolExecutor 充分利用多核 CPU，讀檔與計算並行，單 writer 保持資料一致性。</span><span class="en">ThreadPoolExecutor fully utilises multi-core CPUs for parallel file reading and computation. A single writer maintains data consistency.</span></li>
+      <li><strong><span class="zh">Tombstone 機制正確處理刪除</span><span class="en">Tombstone Handles Deletions</span></strong>：<span class="zh">不只索引新增/修改，也追蹤刪除，確保搜尋結果不會出現已刪除的檔案。</span><span class="en">Tracks not just adds/modifications but also deletions, so deleted files never appear in results.</span></li>
+      <li><strong><span class="zh">豐富的搜尋模式</span><span class="en">Rich Search Modes</span></strong>：<span class="zh">精確、前綴、子字串、Glob 萬用字元、Fuzzy、HEX、副檔名，六種模式加四層篩選器，可覆蓋各種搜尋需求。</span><span class="en">Exact, prefix, substring, glob, fuzzy, HEX, extension—six modes plus four post-query filters covering every search need.</span></li>
+      <li><strong><span class="zh">自動偵測索引模式</span><span class="en">Auto-detect Index Mode</span></strong>：<span class="zh">Tiered / Main-only / Legacy 三種模式自動切換，新舊 DB 格式向下相容。</span><span class="en">Tiered / Main-only / Legacy modes switch automatically. Old and new DB formats are backward compatible.</span></li>
+      <li><strong><span class="zh">HEX 搜尋支援二進位</span><span class="en">HEX Binary Search</span></strong>：<span class="zh">可搜尋 .rom/.efi/.fd 中的 magic byte 序列，不受檔案對齊限制（滑動視窗）。</span><span class="en">Searches magic byte sequences in .rom/.efi/.fd files without alignment constraints (sliding window).</span></li>
+      <li><strong><span class="zh">build_chain / build_history 批次建立</span><span class="en">build_chain / build_history Batch Build</span></strong>：<span class="zh">一次為所有分支或所有 commit 建立索引，再也不需要逐一 checkout。</span><span class="en">Index all branches or all commits in one go—no more manual checkout per branch.</span></li>
+      <li><strong><span class="zh">可配置的 Profile 和跳過規則</span><span class="en">Configurable Profile &amp; Skip Rules</span></strong>：<span class="zh">JSON 設定檔讓使用者自訂副檔名群組和排除規則，不需修改原始碼。</span><span class="en">JSON config lets users customise extension groups and exclusion rules without modifying source code.</span></li>
+      <li><strong><span class="zh">跨平台</span><span class="en">Cross-platform</span></strong>：<span class="zh">純 Python + SQLite，在 Windows/Linux/macOS 均可執行，也支援 PyInstaller 打包為單一 EXE。</span><span class="en">Pure Python + SQLite. Runs on Windows/Linux/macOS. Also supports PyInstaller packaging as a single EXE.</span></li>
+    </ul>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 15. 限制 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="limitations">
+    <div class="section-eyebrow">15 / limitations</div>
+    <h2><span class="zh">限制</span><span class="en">Limitations</span></h2>
+
+    <ul class="limit-list">
+      <li><strong><span class="zh">Fuzzy 不支援插入與轉置</span><span class="en">Fuzzy: No Insertion or Transposition</span></strong>：<span class="zh"><code>search_fuzzy()</code> 支援刪除與替換（dist=1 展開），但不支援插入（"OemDxe" → "OemDxes"）或轉置（"OemDxe" → "OmeDxe"）；dist≥2 時轉置錯誤通常仍可被覆蓋。</span><span class="en"><code>search_fuzzy()</code> supports deletion and substitution but not insertion ("OemDxe"→"OemDxes") or transposition ("OemDxe"→"OmeDxe"). Transpositions at dist≥2 are usually still covered.</span></li>
+      <li><strong><span class="zh">Minor 不是真正的增量鏈</span><span class="en">Minor Not a True Incremental Chain</span></strong>：<span class="zh">每個 Minor 都是對 Main 的完整差量，不支援 Minor→Minor 的鏈式增量。換言之，Minor_v07_09 不能基於 Minor_v07_08 建立，必須重新 diff Main。</span><span class="en">Each Minor is a full diff against Main—no Minor→Minor chaining. Minor_v07_09 cannot be based on Minor_v07_08; must re-diff Main.</span></li>
+      <li><strong><span class="zh">HEX 索引會大幅增加 DB 大小</span><span class="en">HEX Indexing Inflates DB Size</span></strong>：<span class="zh">對大型二進位倉庫全面啟用 <code>--hex</code> 會讓 DB 膨脹數倍，需謹慎評估。</span><span class="en">Fully enabling <code>--hex</code> on large binary repos can inflate the DB severalfold.</span></li>
+      <li><strong><span class="zh">不支援正規表示式（Regex）搜尋</span><span class="en">No Regex Search</span></strong>：<span class="zh">FTS5 Trigram 模式不提供 regex 查詢，只能透過 <code>--grep</code> 做 post-filtering。</span><span class="en">FTS5 Trigram does not support regex queries. Use <code>--grep</code> for post-filtering instead.</span></li>
+      <li><strong><span class="zh">不支援多行 grep</span><span class="en">No Multi-line Grep</span></strong>：<span class="zh"><code>--grep</code> 篩選是逐行比對，無法匹配跨行的模式（如函式定義跨多行）。</span><span class="en"><code>--grep</code> filters line-by-line; cannot match patterns spanning multiple lines (e.g. multi-line function definitions).</span></li>
+      <li><strong><span class="zh">SQLite 並發寫入受限</span><span class="en">SQLite Concurrent Write Limit</span></strong>：<span class="zh">WAL 模式雖允許多讀一寫，但同時只能有一個 build 程序寫入同一個 DB，不支援分散式建立。</span><span class="en">WAL mode allows multiple readers but only one build process can write to the same DB. Distributed builds are not supported.</span></li>
+      <li><strong><span class="zh">需要 git 才能使用分層功能</span><span class="en">Git Required for Tiered Features</span></strong>：<span class="zh"><code>build_minor</code>、<code>build_chain</code> 等功能完全依賴 git CLI，非 git 倉庫只能使用 <code>build</code> 單一索引模式。</span><span class="en"><code>build_minor</code>, <code>build_chain</code> etc. depend entirely on git CLI. Non-git repos can only use the single <code>build</code> mode.</span></li>
+      <li><strong><span class="zh">64 MB 檔案大小上限</span><span class="en">64 MB File Size Limit</span></strong>：<span class="zh">預設跳過超過 64 MB 的檔案（可在 JSON 設定 <code>max_file_mb</code> 調整），超大型二進位檔無法索引。</span><span class="en">Files over 64 MB are skipped by default (configurable via <code>max_file_mb</code> in JSON). Very large binaries cannot be indexed.</span></li>
+      <li><strong><span class="zh">自動建立 minor 有延遲</span><span class="en">Auto-build Minor Has Latency</span></strong>：<span class="zh">第一次搜尋時觸發自動 build_minor，會有數秒到數十秒的延遲，後續搜尋才恢復毫秒級。</span><span class="en">First search on a new branch triggers auto build_minor, causing a delay of seconds to tens of seconds. Subsequent searches return to millisecond speed.</span></li>
+      <li><strong><span class="zh">索引不含行號資訊</span><span class="en">Index Does Not Store Line Numbers</span></strong>：<span class="zh">FTS5 content 欄位只存完整文字，行號是搜尋時即時從原始檔讀取的，若原始檔被移動或刪除，行號顯示會失效。</span><span class="en">FTS5 content column stores full text only. Line numbers are read from the source file at query time; if the file is moved or deleted, line numbers will be invalid.</span></li>
+      <li><strong><span class="zh">不支援符號語意搜尋</span><span class="en">No Semantic Symbol Search</span></strong>：<span class="zh">無法理解「這個函式呼叫了哪些函式」或「這個型別的所有用法」，只能做字串層面的搜尋。</span><span class="en">Cannot understand "what functions does this call" or "all usages of this type"—string-level search only.</span></li>
+    </ul>
+  </section>
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- X. 進階限制與風險評估 -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="advanced-risks">
+  <div class="section-eyebrow">X / advanced risks</div>
+  <h2><span class="zh">進階限制與風險評估</span><span class="en">Advanced Risks &amp; Limitations</span></h2>
+
+  <ul class="limit-list">
+    <li>
+      <strong>索引 DB 的生命週期管理需要人為介入</strong>：
+      當啟用 <code>build_history</code>、長期保留多個 main 版本，
+      或對二進位檔大量啟用 <code>--hex</code> 時，
+      SQLite DB 會持續累積，磁碟空間與管理成本上升。
+      目前系統提供 <code>cleanup</code>、<code>build_promote</code> 等工具，
+      但尚未內建「保留策略」（例如僅保留最近 N 個 main 或以容量為門檻的自動清理）。
+    </li>
+
+    <li>
+      <strong>search_fuzzy 的結果一致性依賴使用者理解其模型</strong>：
+      Fuzzy 搜尋支援刪除與替換兩種展開，對「少打或打錯一個字」均有效，
+      但不支援插入或轉置；dist≥2 進一步透過 Pigeonhole 加速，Phase 2 以 Levenshtein 精確驗證。
+      複合運算式（A-&gt;B）亦能驗證結構順序，但仍建議僅將 fuzzy 作為「輔助縮小範圍」的工具，而非唯一搜尋手段。
+    </li>
+
+    <li>
+      <strong>第一次自動 build_minor 可能造成搜尋延遲體感</strong>：
+      在 auto-build 啟用的情況下，
+      使用者於新分支首次搜尋時，系統可能觸發 <code>build_minor()</code>，
+      導致搜尋回應從毫秒級延遲至數秒甚至數十秒。
+      此行為屬刻意設計的效能取捨，
+      但在 GUI 使用情境中可能需要額外提示以避免誤解為「程式卡住」。
+    </li>
+
+    <li>
+      <strong>GUI 層為 Thin Wrapper，功能與 CLI 完全對齊</strong>：
+      目前 GUI 著重於搜尋體驗，並未實作進階索引管理（如 build_chain、cleanup、promote）。
+      在多人共用或非工程背景使用者場景中，
+      仍需搭配 CLI 或預先建立索引，
+      GUI 並非完整管理介面，而是核心引擎的輕量視窗入口。
+    </li>
+
+    <li>
+      <strong>FTS5 Trigram 對極短關鍵字仍需退回線性掃描</strong>：
+      長度小於 3 的子字串搜尋會退回 <code>LIKE</code>，
+      在查詢頻繁且範圍廣的情況下，可能造成效能下降。
+      這是 trigram tokenizer 的先天限制，
+      而非 KVHSearch 的實作問題。
+    </li>
+
+    <li>
+      <strong>索引系統為「內容導向」，非「語意導向」</strong>：
+      KVHSearch 僅對檔案內容與路徑建立倒排索引，
+      不理解語言結構、函式邊界、型別關係或呼叫圖。
+      對需要語意分析的需求（例如「誰呼叫了這個 API」），
+      仍需搭配 ctags、cscope 或 LSP 類工具使用。
+    </li>
+  </ul>
+</section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 16. 工具比較 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="comparison">
+    <div class="section-eyebrow">16 / comparison</div>
+    <h2><span class="zh">工具比較</span><span class="en">Tool Comparison</span></h2>
+
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th><span class="zh">特性</span><span class="en">Feature</span></th>
+          <th>KVHSearch</th>
+          <th>grep / ripgrep</th>
+          <th>Elasticsearch</th>
+          <th>ctags / cscope</th>
+          <th>VS Code Search</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="zh">搜尋速度</span><span class="en">Search Speed</span></td>
+          <td><span class="badge green">毫秒級（indexed）</span></td>
+          <td><span class="badge blue">秒級（線性掃描）</span></td>
+          <td><span class="badge green">毫秒級</span></td>
+          <td><span class="badge blue">秒級</span></td>
+          <td><span class="badge yellow">1-5 秒</span></td>
+        </tr>
+        <tr>
+          <td><span class="zh">需要網路/服務</span><span class="en">Requires Network/Service</span></td>
+          <td><span class="badge green">否（離線）</span></td>
+          <td><span class="badge green">否</span></td>
+          <td><span class="badge red">需要 JVM + ES 服務</span></td>
+          <td><span class="badge green">否</span></td>
+          <td><span class="badge green">否（本機）</span></td>
+        </tr>
+        <tr>
+          <td><span class="zh">二進位 HEX 搜尋</span><span class="en">Binary HEX Search</span></td>
+          <td><span class="badge green">✓ 滑動視窗 token</span></td>
+          <td><span class="badge blue">grep -P （有限）</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge red">不支援</span></td>
+        </tr>
+        <tr>
+          <td><span class="zh">Fuzzy 搜尋</span><span class="en">Fuzzy Search</span></td>
+          <td><span class="badge yellow">刪除 + 替換距離</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge green">完整 Levenshtein</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge red">不支援</span></td>
+        </tr>
+        <tr>
+          <td><span class="zh">Regex 搜尋</span><span class="en">Regex Search</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge green">完整 PCRE</span></td>
+          <td><span class="badge green">支援</span></td>
+          <td><span class="badge blue">部分</span></td>
+          <td><span class="badge green">支援</span></td>
+        </tr>
+        <tr>
+          <td><span class="zh">Git 增量更新</span><span class="en">Git Incremental Update</span></td>
+          <td><span class="badge green">✓ diff + blob SHA</span></td>
+          <td><span class="badge red">不適用</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge red">不支援</span></td>
+        </tr>
+        <tr>
+          <td><span class="zh">20,000 檔案 2GB 重建時間</span><span class="en">20k Files 2 GB Rebuild Time</span></td>
+          <td><span class="badge green">~60s（首次）</span><br><span class="badge blue">~5s（增量 minor）</span></td>
+          <td><span class="badge blue">不需建立</span></td>
+          <td><span class="badge yellow">分鐘級</span></td>
+          <td><span class="badge yellow">~30-120s</span></td>
+          <td><span class="badge yellow">~30-60s</span></td>
+        </tr>
+        <tr>
+          <td><span class="zh">語意搜尋（符號、呼叫圖）</span><span class="en">Semantic Search (symbols, call graph)</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge red">不支援</span></td>
+          <td><span class="badge green">✓ 符號定義/參考</span></td>
+          <td><span class="badge blue">LSP 支援</span></td>
+        </tr>
+        <tr>
+          <td><span class="zh">磁碟佔用</span><span class="en">Disk Usage</span></td>
+          <td><span class="badge yellow">~200-500 MB（倒排索引）</span></td>
+          <td><span class="badge green">0 MB</span></td>
+          <td><span class="badge red">GB 級</span></td>
+          <td><span class="badge green">~50 MB</span></td>
+          <td><span class="badge yellow">~100-300 MB</span></td>
+        </tr>
+        <tr>
+          <td><span class="zh">多分支同時搜尋</span><span class="en">Multi-branch Simultaneous Search</span></td>
+          <td><span class="badge green">✓ Tiered 分層</span></td>
+          <td><span class="badge red">需手動 checkout</span></td>
+          <td><span class="badge blue">需多個 index</span></td>
+          <td><span class="badge red">單一 DB</span></td>
+          <td><span class="badge red">需手動切換</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="callout tip">
+      <div class="icon">💡</div>
+      <div class="body">
+        <span class="zh"><strong>最佳使用場景</strong>
+        KVHSearch 最適合：大型 BIOS/韌體 Git 倉庫、需要快速跨版本關鍵字搜尋、
+        有大量二進位檔案（需要 HEX 搜尋）、開發環境受限（無法安裝重量級搜尋服務）的場景。
+        若需要符號語意搜尋，建議搭配 ctags/cscope 使用；若需要 Regex，可用 KVHSearch 縮小範圍後再用 ripgrep。</span>
+        <span class="en"><strong>Best Use Cases</strong>
+        KVHSearch is ideal for: large BIOS/firmware Git repositories, fast cross-version keyword search,
+        large numbers of binary files (requiring HEX search), and constrained environments where
+        heavy search services cannot be installed.
+        For symbol-semantic search pair with ctags/cscope; for Regex, use KVHSearch to narrow scope then ripgrep.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 17. 使用範例 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="examples">
+    <div class="section-eyebrow">17 / examples</div>
+    <h2><span class="zh">使用範例</span><span class="en">Usage Examples</span></h2>
+
+    <h3><span class="zh">建立索引</span><span class="en">Build Index</span></h3>
+    <pre><code><span class="cm"># 在 main 分支上建立完整 Main Index（加版本標籤）</span>
+python Build_Index_cli.py build_main E:/Git/Cathaya --label v08
+
+<span class="cm"># 切換到 feature 分支，建立 Minor Index</span>
+git checkout feature/oem-dxe
+python Build_Index_cli.py build_minor E:/Git/Cathaya --label v08
+
+<span class="cm"># 一次為所有比 v08 新的分支建立 Minor（會自動 checkout + stash）</span>
+python Build_Index_cli.py build_chain E:/Git/Cathaya --label v08
+
+<span class="cm"># 為所有歷史 commit 建立 Minor（時光機搜尋）</span>
+python Build_Index_cli.py build_history E:/Git/Cathaya --label v07
+
+<span class="cm"># DB 與 Repo 分離存放（例如把 DB 放在 SSD）</span>
+python Build_Index_cli.py build_main E:/Git/Cathaya \
+    --db-dir D:/indexes/Cathaya --label v08 --workers 16
+
+<span class="cm"># 同時索引二進位檔的 HEX 內容</span>
+python Build_Index_cli.py build_main E:/Git/Cathaya --hex
+
+<span class="cm"># 查看所有索引的狀態</span>
+python Build_Index_cli.py status E:/Git/Cathaya</code></pre>
+
+    <h3><span class="zh">搜尋</span><span class="en">Search</span></h3>
+    <pre><code><span class="cm"># 精確 AND 搜尋（同時含 OemDxe 和 EFI_STATUS）</span>
+python Search_cli.py search OemDxe EFI_STATUS
+
+<span class="cm"># 只搜尋 .c 和 .h 檔，且路徑含 LenovoWsPkg</span>
+python Search_cli.py search OemDxe --ext .c .h --path LenovoWsPkg
+
+<span class="cm"># 使用 Profile 名稱（展開為 .c .cpp .h .hpp）</span>
+python Search_cli.py search OemDxe --ext c
+
+<span class="cm"># 前綴搜尋，排除 .inf 和 .sdl</span>
+python Search_cli.py prefix Oem --ext .h --exclude *.inf *.sdl
+
+<span class="cm"># 子字串搜尋，同時用 --grep 過濾行內容</span>
+python Search_cli.py substr OemDxe --path OemDxe --grep TRACE
+
+<span class="cm"># Glob 萬用字元搜尋（* 任意序列、? 單字元、[...] 字元類別）</span>
+python Search_cli.py glob "Oem*Dxe"
+python Search_cli.py glob "PcdGet[0-9][0-9]" --ext .c .h
+python Search_cli.py glob "gEfi*Protocol" --path LenovoWsPkg
+
+<span class="cm"># Fuzzy 搜尋（拼字容錯，編輯距離 1；支援 C 複合運算式）</span>
+python Search_cli.py fuzzy OemDxe 1
+python Search_cli.py fuzzy "gProtocol->IsSupported" 1
+
+<span class="cm"># HEX 搜尋（需 --hex 建立的索引）</span>
+python Search_cli.py hex DEADBEEF AA55
+
+<span class="cm"># 列出所有 .c 和 .h 檔</span>
+python Search_cli.py ext .c .h
+
+<span class="cm"># 列出所有可用的 Profile</span>
+python Search_cli.py ext --list
+
+<span class="cm"># 從指定 DB 目錄搜尋（與建立時相同 --db-dir）</span>
+python Search_cli.py search OemDxe --db-dir D:/indexes/Cathaya</code></pre>
+
+    <h3><span class="zh">維護指令</span><span class="en">Maintenance Commands</span></h3>
+    <pre><code><span class="cm"># 移除孤立的 minor DB（分支已刪除但 DB 還在）</span>
+python Build_Index_cli.py cleanup E:/Git/Cathaya
+
+<span class="cm"># 將 Minor 合併升格為新版 Main（壓縮分層）</span>
+python Build_Index_cli.py build_promote \
+    --from v07 --minor abc1234 --to v08</code></pre>
+
+    <h3><span class="zh">build_index_profiles.json 自訂範例</span><span class="en">build_index_profiles.json Custom Example</span></h3>
+    <pre><code>{
+  <span class="st">"myproject"</span>: [<span class="st">".c"</span>, <span class="st">".h"</span>, <span class="st">".asl"</span>, <span class="st">".inf"</span>],   <span class="cm">// 自訂 Profile</span>
+  <span class="st">"skip"</span>: {
+    <span class="st">"max_file_mb"</span>: <span class="nu">32</span>,                         <span class="cm">// 跳過 32 MB 以上</span>
+    <span class="st">"folders"</span>: [<span class="st">".git"</span>, <span class="st">"build"</span>, <span class="st">"output"</span>],
+    <span class="st">"extensions"</span>: [<span class="st">".exe"</span>, <span class="st">".dll"</span>, <span class="st">".pdf"</span>],
+    <span class="st">"patterns"</span>: [<span class="st">"*.bak"</span>, <span class="st">"~*"</span>]
+  }
+}</code></pre>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- 18. 總結 -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="summary">
+    <div class="section-eyebrow">18 / summary</div>
+    <h2><span class="zh">總結</span><span class="en">Summary</span></h2>
+
+    <div class="zh"><p>
+      KVHSearch 是一套針對大型韌體/BIOS Git 倉庫（~20,000 檔案、~2 GB）的
+      <strong>離線全文倒排索引搜尋引擎</strong>，其核心設計理念如下：
+    </p></div>
+    <div class="en"><p>
+      KVHSearch is an <strong>offline full-text inverted-index search engine</strong>
+      purpose-built for large UEFI/BIOS Git repositories (~20,000 files, ~2 GB).
+      Its core design principles are:
+    </p></div>
+
+    <div class="step-list">
+      <div class="step">
+        <div class="step-body">
+          <span class="zh"><strong>分層索引（Tiered Index）是核心創新</strong>
+          Main Index 提供完整快照，Minor Index 只記錄 git diff 差量（含 Tombstone），
+          搜尋時即時合併，讓頻繁切換分支的開發環境中重建時間從分鐘降到秒。</span>
+          <span class="en"><strong>Tiered Indexing is the Core Innovation</strong>
+          Main Index is a full snapshot; Minor Index records only git diff deltas (incl. Tombstones).
+          They are merged at query time, reducing rebuild time from minutes to seconds in
+          fast-switching branch environments.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-body">
+          <span class="zh"><strong>三層跳過策略最大化增量效能</strong>
+          優先用 git blob SHA（零讀檔）→ mtime（metadata only）→ BLAKE2b（完整讀取），
+          在日常重建中可跳過 95%+ 的未修改檔案。</span>
+          <span class="en"><strong>Three-tier Skip Strategy Maximises Incremental Performance</strong>
+          git blob SHA (zero reads) → mtime (metadata only) → BLAKE2b (full read).
+          In daily rebuilds, 95%+ of unchanged files are skipped.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-body">
+          <span class="zh"><strong>SQLite FTS5 Trigram 提供亞線性查詢</strong>
+          Trigram 倒排索引讓任意子字串搜尋都能透過索引完成（而非線性掃描），
+          20,000 個檔案的精確搜尋典型 10–50 ms 完成。</span>
+          <span class="en"><strong>SQLite FTS5 Trigram Delivers Sub-linear Queries</strong>
+          The Trigram inverted index resolves any substring search through the index (not linear scan).
+          Exact searches across 20,000 files typically complete in 10–50 ms.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-body">
+          <span class="zh"><strong>自動化運維降低門檻</strong>
+          <code>build_chain</code> 批次建立、<code>auto-build</code> 搜尋時觸發、
+          <code>status</code> 即時報表、<code>cleanup</code> 自動清理孤立 DB，
+          日常使用幾乎不需要手動干預。</span>
+          <span class="en"><strong>Automated Operations Lower the Barrier</strong>
+          <code>build_chain</code> batch build, <code>auto-build</code> triggered at search time,
+          <code>status</code> live reports, <code>cleanup</code> auto-removes orphaned DBs—
+          daily use requires almost no manual intervention.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-body">
+          <span class="zh"><strong>六種搜尋模式 + 四層篩選器覆蓋大多數需求</strong>
+          精確／前綴／子字串／Glob 萬用字元／Fuzzy／HEX 搭配副檔名／路徑／glob 排除／grep 行過濾，
+          可以精準縮小結果集，提高搜尋效率。</span>
+          <span class="en"><strong>Six Search Modes + Four Filters Cover Most Needs</strong>
+          Exact / Prefix / Substring / Glob wildcard / Fuzzy / HEX combined with extension /
+          path / glob exclusion / grep line filter—precisely narrows result sets for maximum efficiency.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout info" style="margin-top: 28px;">
+      <div class="icon">📌</div>
+      <div class="body">
+        <span class="zh"><strong>建議工作流程</strong>
+        發布新主版本時執行 <code>build_main --label vNN</code>；
+        日常開發中每個 feature branch 執行 <code>build_minor --label vNN</code>；
+        搜尋時直接呼叫 <code>Search_cli.py</code> 或 GUI，系統自動選擇最佳索引組合。
+        Minor 積累過多時，可用 <code>build_promote</code> 壓縮為下一版 Main。</span>
+        <span class="en"><strong>Recommended Workflow</strong>
+        Run <code>build_main --label vNN</code> when releasing a new major version.
+        Run <code>build_minor --label vNN</code> for each feature branch during daily development.
+        Search via <code>Search_cli.py</code> or the GUI—the system auto-selects the optimal index combination.
+        When minors accumulate, use <code>build_promote</code> to compress them into the next Main.</span>
+      </div>
+    </div>
+
+    <div style="margin-top: 48px; padding: 20px; border: 1px solid var(--border2); border-radius: 10px; text-align: center;">
+      <div style="font-family:'JetBrains Mono',monospace; font-size: 11px; color: var(--text2); letter-spacing: 2px; text-transform: uppercase;">
+        KVHSearch v1.0.0 &nbsp;·&nbsp; © 2026 KVH &nbsp;·&nbsp; SQLite FTS5 Trigram Engine
+      </div>
+      <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">
+        kvhsearch_core.py &nbsp;·&nbsp; Build_Index_cli.py &nbsp;·&nbsp; Search_cli.py &nbsp;·&nbsp; KVHSearch_Gui.py
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- TEST RESULTS                                                          -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <section class="section" id="test-results">
+    <div class="section-eyebrow">test results</div>
+    <h2>Test Results</h2>
+
+    <p style="color:var(--text2);margin-bottom:24px;">
+      Automated test suite <code>test_search.py</code> covering algorithm units, search integration,
+      option combinations and random mutation variants. All tests run against the real <code>v07</code> DB; wall time ~133 s.
+    </p>
+
+    <!-- Summary banner -->
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:32px;">
+      <div style="flex:1;min-width:140px;padding:20px;background:var(--bg2);border:1px solid var(--green);border-radius:10px;text-align:center;">
+        <div style="font-size:36px;font-weight:700;color:var(--green);font-family:'JetBrains Mono',monospace;">85</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px;">PASSED</div>
+      </div>
+      <div style="flex:1;min-width:140px;padding:20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;text-align:center;">
+        <div style="font-size:36px;font-weight:700;color:var(--text2);font-family:'JetBrains Mono',monospace;">0</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px;">FAILED</div>
+      </div>
+      <div style="flex:1;min-width:140px;padding:20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;text-align:center;">
+        <div style="font-size:36px;font-weight:700;color:var(--text2);font-family:'JetBrains Mono',monospace;">0</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px;">SKIPPED</div>
+      </div>
+      <div style="flex:1;min-width:140px;padding:20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;text-align:center;">
+        <div style="font-size:36px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace;">133s</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px;">Wall time</div>
+      </div>
+      <div style="flex:1;min-width:140px;padding:20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:var(--yellow);font-family:'JetBrains Mono',monospace;">2026&#8209;04&#8209;21</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px;">Last run</div>
+      </div>
+    </div>
+
+    <!-- Per-group table -->
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:10px 12px;color:var(--text2);font-weight:500;">Group</th>
+          <th style="text-align:center;padding:10px 8px;color:var(--text2);font-weight:500;">Tests</th>
+          <th style="text-align:left;padding:10px 12px;color:var(--text2);font-weight:500;">Coverage</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border2);">
+          <td style="padding:10px 12px;"><code>GROUP 1</code><br><span style="font-size:12px;color:var(--text2);">Algorithm unit</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">17</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;"><code>_levenshtein</code>, <code>_fuzzy_variants_dist1</code>, <code>_pigeonhole_parts</code>, <code>_parse_structure</code>, <code>_split_compound</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border2);">
+          <td style="padding:10px 12px;"><code>GROUP 1b</code><br><span style="font-size:12px;color:var(--text2);">Glob escaping unit</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">10</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;"><code>.</code> <code>+</code> <code>()</code> <code>|</code> as literals; <code>[class]*word</code>; <code>???</code>; <code>_glob_literal_parts</code> leading/trailing/all-wildcard</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border2);">
+          <td style="padding:10px 12px;"><code>GROUP 2</code><br><span style="font-size:12px;color:var(--text2);">Search integration</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">22</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;">All 5 modes (substr / prefix / exact / glob / fuzzy) vs real DB; stop event; progress callback; dist cap warning; unicode; 2-char keyword</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border2);">
+          <td style="padding:10px 12px;"><code>GROUP 3</code><br><span style="font-size:12px;color:var(--text2);">Scope &amp; filter</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">5</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;"><code>scope=txt</code>, <code>ext_filter</code>, <code>path_filter</code>, <code>excl_filter</code>, <code>grep_filter</code></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border2);">
+          <td style="padding:10px 12px;"><code>GROUP 4</code><br><span style="font-size:12px;color:var(--text2);">Edge / boundary</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">3</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;">100-char keyword; unicode search; 1-char glob literals</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border2);">
+          <td style="padding:10px 12px;"><code>GROUP 5b</code><br><span style="font-size:12px;color:var(--text2);">Glob deep integration</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">8</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;">Leading/trailing <code>*</code>; dot literal; <code>???</code> early-exit guard; <code>grep_filter</code>; <code>ext_filter</code>; <code>scope=txt</code>; <code>path_filter</code> combos</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border2);">
+          <td style="padding:10px 12px;"><code>GROUP 6</code><br><span style="font-size:12px;color:var(--text2);">Random morphing</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">4</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;">24 iterations (seeded RNG=42): substr×8 / prefix×6 / glob×6 / fuzzy×4; random <code>ext_filter</code>, <code>path_filter</code>, <code>scope</code>, <code>sort</code>; result constraints verified</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border2);">
+          <td style="padding:10px 12px;"><code>GROUP 7A</code><br><span style="font-size:12px;color:var(--text2);">ext_filter per mode</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">5</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;"><code>[.c]</code> substr; <code>[.inf]</code> prefix; <code>[.c,.cpp]</code> glob; <code>[.h]</code> fuzzy; <code>[.h]</code> search_exact &mdash; suffix verified on every result line</td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border2);">
+          <td style="padding:10px 12px;"><code>GROUP 7B</code><br><span style="font-size:12px;color:var(--text2);">excl_filter path-level</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">3</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;"><code>*.c/*.cpp</code> fnmatch exclusion; <code>*include*</code> full-path exclusion; combined <code>ext_filter + excl_filter</code></td>
+        </tr>
+        <tr>
+          <td style="padding:10px 12px;"><code>GROUP 7C</code><br><span style="font-size:12px;color:var(--text2);">GUI ext_raw parsing</span></td>
+          <td style="text-align:center;padding:10px 8px;"><span style="color:var(--green);font-weight:600;">6</span></td>
+          <td style="padding:10px 12px;color:var(--text2);font-size:13px;"><code>*.*</code> → None; semicolon <code>*.c;*.h;*.cpp</code>; single <code>*.c</code>; profile <code>c</code> → <code>EXT_PROFILES["c"]</code>; profile <code>asl</code>; raw <code>.inf</code>/<code>inf</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Bugs found callout -->
+    <div class="callout info" style="margin-top:28px;">
+      <div class="icon">🐞</div>
+      <div class="body">
+        <strong>Bugs found during test development</strong>
+        <ul style="margin-top:8px;padding-left:18px;font-size:13px;color:var(--text2);line-height:2;">
+          <li><code>search_exact([])</code> &mdash; empty keyword list generated invalid FTS5 query (<code>MATCH &quot;&quot;</code>). Fixed: added early-return guard.</li>
+          <li><code>excl_filter=[".c"]</code> &mdash; bare extension string does not match filenames; must be fnmatch glob <code>"*.c"</code>. Test corrected.</li>
+          <li>SyntaxWarning <code>\(</code> in docstring &mdash; fixed to <code>\\(</code>.</li>
+          <li><code>_verify_sf()</code> in random test &mdash; fuzzy status header line matched file-path heuristic; fixed by requiring Windows drive-letter prefix.</li>
+          <li><code>_glob_literal_parts("OemPeiI*")</code> returns <code>["OemPeiI"]</code> (7 chars ≥ 3), not <code>[]</code>. Test assertion corrected.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Run instruction -->
+    <div style="margin-top:24px;padding:16px 20px;background:var(--code-bg);border:1px solid var(--border2);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:13px;">
+      <span style="color:var(--text2);">$</span> <span style="color:var(--accent3);">cd</span> KVHSearch<br>
+      <span style="color:var(--text2);">$</span> <span style="color:var(--accent3);">python</span> test_search.py
+      <div style="margin-top:8px;color:var(--green);">  SUMMARY:&nbsp; 85 passed,&nbsp; 0 failed,&nbsp; 0 skipped &nbsp;&nbsp; Wall time: 133.0s</div>
+    </div>
+
+  </section>
+
+</main>
+
+<script>
+  // Active nav highlight — robust scrollspy
+  const sections = document.querySelectorAll('.section');
+  const links    = document.querySelectorAll('#sidebar a');
+  const _visible = new Map(); // section id → boundingClientRect.top
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) _visible.set(e.target.id, e.boundingClientRect.top);
+      else _visible.delete(e.target.id);
+    });
+    // Pick the topmost visible section that has a matching sidebar nav link.
+    // Sections without a nav link (e.g. advanced-risks) are skipped silently.
+    let best = null, bestY = Infinity;
+    _visible.forEach((top, id) => {
+      const link = document.querySelector(`#sidebar a[href="#${id}"]`);
+      if (link && top < bestY) { bestY = top; best = link; }
+    });
+    links.forEach(l => l.classList.remove('active'));
+    if (best) best.classList.add('active');
+  }, { rootMargin: '-10% 0px -50% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+
+  /* ── Language toggle ── */
+  function setLang(lang) {
+    document.body.classList.toggle('lang-en', lang === 'en');
+    document.getElementById('btn-zh').classList.toggle('active', lang !== 'en');
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    try { localStorage.setItem('kvh_lang', lang); } catch(e) {}
+  }
+  (function() {
+    try {
+      const saved = localStorage.getItem('kvh_lang');
+      if (saved === 'en') setLang('en');
+    } catch(e) {}
+  })();
+</script>
+</body>
+</html>

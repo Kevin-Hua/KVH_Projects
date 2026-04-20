@@ -1,0 +1,8 @@
+{
+  "db_dir": "E:\\Git\\Cathaya",
+  "repo_dir": "e:\\Git\\repository\\KVHSearch",
+  "ext": "*.c;*.cpp;*.h;*.hpp",
+  "path": "",
+  "exclude": "*.chm *.lib *.mcb *.exe *.pdf *.obj *.rom *.zip *.bin *.fd *.jar *.pdb *.asar *.dat *.pak *.7z *.py *.dll *.bmp *.gif *.jpg *.efi *.png *.ttf *.key *.so *.sh *.ldl *.mof *.bsf *.s *.pem *.cbin *.aid *.db *.dbr *.csm RomAlignment.* iasl*.* BiosGuardCryptoCon*.* HPKTool_Linux*.* fit.* cryptocon.* cutrom.* BpmKmGen.* openssl.*",
+  "grep": ""
+}
