@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TDX Bus</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#060c18;--panel:#0f172a;--card:#1e293b;--card-hover:#263548;
+  --blue:#60a5fa;--yellow:#facc15;--green:#34d399;--red:#f87171;--gray:#64748b;
+  --teal:#2dd4bf;--orange:#fb923c;
+  --text:#e2e8f0;--dim:#94a3b8;--border:#1e293b;
+  --font-sans:'Segoe UI',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono','Cascadia Code',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font-sans);min-height:100vh;padding-bottom:50px}
+button{font-family:inherit;cursor:pointer}
+
+/* -- Header -- */
+.header{background:var(--panel);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:200}
+.header h1{font-size:16px;color:var(--blue);font-weight:600;white-space:nowrap}
+.header .search-trigger{flex:1;max-width:400px;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--dim);font-size:14px;text-align:left;transition:border-color .2s}
+.header .search-trigger:hover{border-color:var(--blue)}
+.header .settings-btn{background:none;border:none;color:var(--dim);font-size:18px;padding:4px 8px}
+.header .settings-btn:hover{color:var(--text)}
+
+/* -- Group tabs -- */
+.group-bar{background:var(--panel);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;gap:0;overflow-x:auto;position:sticky;top:44px;z-index:190}
+.group-bar::-webkit-scrollbar{height:0}
+.group-tab{padding:10px 16px;font-size:14px;color:var(--dim);white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;transition:all .2s;user-select:none}
+.group-tab.active{color:var(--text);border-bottom-color:var(--blue)}
+.group-tab:hover{color:var(--text)}
+.group-add-btn{padding:10px 12px;font-size:16px;color:var(--blue);cursor:pointer;border:none;background:none}
+
+/* -- Dashboard stops -- */
+.dashboard{max-width:700px;margin:16px auto;padding:0 16px}
+.dash-empty{text-align:center;padding:60px 20px;color:var(--dim)}
+.dash-empty h3{color:var(--text);margin-bottom:8px}
+.dash-item{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:12px 16px;background:var(--panel);border-radius:8px;margin-bottom:6px;position:relative}
+.dash-item:hover{background:var(--card)}
+.dash-route-badge{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-family:var(--font-mono);font-weight:700;font-size:15px;color:var(--yellow);text-align:center;min-width:50px}
+.dash-info{overflow:hidden}
+.dash-stop-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-direction{font-size:12px;color:var(--dim);margin-top:2px}
+.dash-eta{text-align:right;min-width:80px}
+.dash-eta-text{font-family:var(--font-mono);font-size:15px;font-weight:600}
+.dash-eta-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.eta-second{color:var(--cyan, #5bc0de);font-size:11px;margin-top:2px}
+.dash-remove{position:absolute;top:4px;right:6px;background:none;border:none;color:var(--gray);font-size:14px;opacity:0;transition:opacity .2s}
+.dash-item:hover .dash-remove{opacity:1}
+.dash-remove:hover{color:var(--red)}
+
+/* -- ETA colors -- */
+.eta-c-arriving{color:var(--red)}
+.eta-c-soon{color:var(--yellow)}
+.eta-c-normal{color:var(--green)}
+.eta-c-gray{color:var(--gray)}
+.eta-c-dim{color:var(--dim)}
+
+/* -- Search overlay -- */
+.search-overlay{position:fixed;inset:0;background:var(--bg);z-index:300;display:none;flex-direction:column}
+.search-overlay.show{display:flex}
+.search-bar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+.search-bar .back-btn{background:none;border:none;color:var(--blue);font-size:20px;padding:4px}
+.search-bar input{flex:1;padding:10px 12px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:16px;outline:none}
+.search-bar input:focus{border-color:var(--blue)}
+.city-chips{padding:8px 16px;display:flex;gap:6px;flex-wrap:wrap}
+.city-chip{padding:4px 10px;border-radius:12px;font-size:12px;border:1px solid var(--border);background:var(--card);color:var(--dim);cursor:pointer;transition:all .2s}
+.city-chip.active{background:var(--teal);color:#000;border-color:var(--teal)}
+.search-content{flex:1;overflow-y:auto;padding:8px 16px}
+.search-city-header{color:var(--teal);font-size:13px;font-weight:600;padding:8px 0 4px;border-bottom:1px solid var(--border);margin-top:12px}
+.search-city-header:first-child{margin-top:0}
+.search-route-item{padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:12px}
+.search-route-item:hover{background:var(--card);margin:0 -8px;padding:12px 8px;border-radius:6px}
+.search-route-name{font-size:18px;font-weight:700;font-family:var(--font-mono)}
+.search-route-dest{font-size:13px;color:var(--dim)}
+.search-loading{text-align:center;padding:40px;color:var(--dim)}
+
+/* -- Route detail overlay -- */
+.route-overlay{position:fixed;inset:0;background:var(--bg);z-index:310;display:none;flex-direction:column}
+.route-overlay.show{display:flex}
+.route-top{background:linear-gradient(135deg,#0f766e,#065f46);padding:20px 16px 12px;text-align:center}
+.route-top .back-btn{position:absolute;top:12px;left:12px;background:none;border:none;color:#fff;font-size:20px}
+.route-top h2{font-size:28px;font-family:var(--font-mono);font-weight:700;color:#fff}
+.route-top .endpoints{color:rgba(255,255,255,.7);font-size:14px;margin-top:4px}
+.route-dir-tabs{display:flex;justify-content:center;gap:24px;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+.route-dir-tab{font-size:14px;color:var(--dim);padding-bottom:6px;border-bottom:2px solid transparent;cursor:pointer}
+.route-dir-tab.active{color:var(--text);border-bottom-color:var(--blue)}
+.route-stops{flex:1;overflow-y:auto;padding:8px 16px}
+.route-stop-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)}
+.route-stop-row .stop-name{flex:1;font-size:15px;font-weight:500}
+.route-stop-row .add-btn{background:var(--card);border:1px solid var(--border);color:var(--blue);width:32px;height:32px;border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.route-stop-row .add-btn:hover{background:var(--blue);color:#000;border-color:var(--blue)}
+.route-stop-row .added-mark{color:var(--green);font-size:14px}
+
+/* -- Group picker popup -- */
+.popup-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:none;align-items:center;justify-content:center}
+.popup-bg.show{display:flex}
+.popup{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;min-width:260px;max-width:90vw}
+.popup h3{font-size:16px;margin-bottom:12px}
+.popup-item{padding:10px 12px;cursor:pointer;border-radius:6px;margin-bottom:4px;transition:background .15s}
+.popup-item:hover{background:var(--card)}
+.popup-cancel{text-align:center;margin-top:12px;color:var(--dim);font-size:13px;cursor:pointer}
+
+/* -- Settings popup -- */
+.settings-popup .setting-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.settings-popup select{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:13px}
+.settings-popup .group-manage-item{display:flex;align-items:center;gap:8px;padding:6px 0}
+.settings-popup .group-manage-item input{flex:1;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:13px}
+.settings-popup .group-manage-item button{background:none;border:none;color:var(--red);font-size:14px}
+
+/* -- Status bar -- */
+.status-bar{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-top:1px solid var(--border);padding:6px 16px;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--dim);z-index:100}
+
+/* -- Animations -- */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.pulse{animation:pulse 1s infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner::after{content:'';display:inline-block;width:14px;height:14px;border:2px solid var(--blue);border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-left:6px}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>TDX Bus</h1>
+  <button class="search-trigger" onclick="openSearch()">Search route...</button>
+  <button class="settings-btn" onclick="openSettings()">&#9881;</button>
+</div>
+
+<!-- Group tabs -->
+<div class="group-bar" id="groupBar"></div>
+
+<!-- Dashboard -->
+<div class="dashboard" id="dashboard"></div>
+
+<!-- Search overlay -->
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-bar">
+    <button class="back-btn" onclick="closeSearch()">&#8592;</button>
+    <input type="text" id="searchInput" placeholder="Route number (e.g. 905, 307...)" autocomplete="off">
+  </div>
+  <div class="city-chips" id="cityChips"></div>
+  <div class="search-content" id="searchContent">
+    <div class="dash-empty"><p>Type a route number to search</p></div>
+  </div>
+</div>
+
+<!-- Route detail overlay -->
+<div class="route-overlay" id="routeOverlay">
+  <div class="route-top" style="position:relative">
+    <button class="back-btn" onclick="closeRoute()">&#8592;</button>
+    <h2 id="routeDetailName"></h2>
+    <div class="endpoints" id="routeDetailEndpoints"></div>
+  </div>
+  <div class="route-dir-tabs" id="routeDirTabs"></div>
+  <div class="route-stops" id="routeStops"></div>
+</div>
+
+<!-- Group picker popup -->
+<div class="popup-bg" id="groupPickerBg">
+  <div class="popup" id="groupPickerPopup">
+    <h3>Add to group</h3>
+    <div id="groupPickerList"></div>
+    <div class="popup-cancel" onclick="closeGroupPicker()">Cancel</div>
+  </div>
+</div>
+
+<!-- Settings popup -->
+<div class="popup-bg" id="settingsBg">
+  <div class="popup settings-popup" style="min-width:300px">
+    <h3>Settings</h3>
+    <div class="setting-row">
+      <span>Auto-refresh</span>
+      <select id="refreshSelect" onchange="saveRefreshSetting()">
+        <option value="15000">15s</option>
+        <option value="30000">30s</option>
+        <option value="60000">60s</option>
+        <option value="0">Manual</option>
+      </select>
+    </div>
+    <h3 style="margin-top:16px;margin-bottom:8px">Groups</h3>
+    <div id="settingsGroupList"></div>
+    <button style="margin-top:8px;background:var(--card);border:1px solid var(--border);color:var(--blue);padding:6px 12px;border-radius:4px;font-size:13px" onclick="addGroupFromSettings()">+ New Group</button>
+    <div class="popup-cancel" style="margin-top:16px" onclick="closeSettings()">Close</div>
+  </div>
+</div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <span id="statusText">Ready</span>
+  <span id="statusRight"></span>
+</div>
+
+<script>
+// ===== Storage =====
+const STORAGE_KEY = 'tdx_bus_data';
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  // Default
+  return {
+    groups: [{ id: 'g1', name: 'My Stops', stops: [] }],
+    activeGroupId: 'g1',
+    refreshInterval: 15000,
+  };
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+}
+
+let appData = loadData();
+
+// ===== State =====
+let selectedCities = ['Taipei', 'NewTaipei'];
+let allCities = [];
+let searchTimer = null;
+let refreshTimer = null;
+
+// Route detail state
+let routeDetailCity = '';
+let routeDetailName = '';
+let routeDetailDeparture = '';
+let routeDetailDestination = '';
+let routeDetailStops = [];
+let routeDetailDir = 0;
+
+// Pending add-to-group
+let pendingStop = null;
+
+// ===== Init =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadCities();
+  renderGroupBar();
+  renderDashboard();
+  startRefresh();
+
+  document.getElementById('searchInput').addEventListener('input', onSearchInput);
+});
+
+// ===== API =====
+async function apiFetch(url, opts) {
+  const resp = await fetch(url, opts);
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error || `HTTP ${resp.status}`);
+  }
+  return resp.json();
+}
+
+// ===== Cities =====
+async function loadCities() {
+  try {
+    allCities = await apiFetch('/api/cities');
+  } catch(e) {
+    allCities = [
+      {City:'Taipei',CityNameZH:'\u81fa\u5317\u5e02'},
+      {City:'NewTaipei',CityNameZH:'\u65b0\u5317\u5e02'},
+    ];
+  }
+}
+
+// ===== Group bar =====
+function renderGroupBar() {
+  const bar = document.getElementById('groupBar');
+  let html = appData.groups.map(g => {
+    const cls = g.id === appData.activeGroupId ? 'active' : '';
+    return `<div class="group-tab ${cls}" onclick="switchGroup('${g.id}')">${g.name}</div>`;
+  }).join('');
+  html += `<button class="group-add-btn" onclick="addGroup()">+</button>`;
+  bar.innerHTML = html;
+}
+
+function switchGroup(id) {
+  appData.activeGroupId = id;
+  saveData();
+  renderGroupBar();
+  renderDashboard();
+  restartRefresh();
+}
+
+function addGroup() {
+  const name = prompt('Group name:');
+  if (!name || !name.trim()) return;
+  const id = 'g' + Date.now();
+  appData.groups.push({ id, name: name.trim(), stops: [] });
+  appData.activeGroupId = id;
+  saveData();
+  renderGroupBar();
+  renderDashboard();
+}
+
+// ===== Dashboard =====
+function getActiveGroup() {
+  return appData.groups.find(g => g.id === appData.activeGroupId) || appData.groups[0];
+}
+
+function renderDashboard() {
+  const container = document.getElementById('dashboard');
+  const group = getActiveGroup();
+  if (!group || group.stops.length === 0) {
+    container.innerHTML = `<div class="dash-empty"><h3>No saved stops</h3><p>Tap "Search route..." to find and add bus stops</p></div>`;
+    return;
+  }
+
+  const html = group.stops.map((s, i) => {
+    const etaId = `eta-${i}`;
+    return `
+      <div class="dash-item">
+        <div class="dash-route-badge">${esc(s.routeName)}</div>
+        <div class="dash-info">
+          <div class="dash-stop-name">${esc(s.stopName)}</div>
+          <div class="dash-direction">${esc(s.dirLabel || '')}</div>
+        </div>
+        <div class="dash-eta" id="${etaId}">
+          <div class="dash-eta-text eta-c-dim">--</div>
+        </div>
+        <button class="dash-remove" onclick="removeStop(${i})">&#10005;</button>
+      </div>
+    `;
+  }).join('');
+  container.innerHTML = html;
+
+  // Fetch ETA immediately
+  fetchGroupEta();
+}
+
+function removeStop(idx) {
+  const group = getActiveGroup();
+  group.stops.splice(idx, 1);
+  saveData();
+  renderDashboard();
+}
+
+// ===== Batch ETA =====
+async function fetchGroupEta() {
+  const group = getActiveGroup();
+  if (!group || group.stops.length === 0) return;
+
+  const body = group.stops.map(s => ({
+    city: s.city,
+    routeName: s.routeName,
+    direction: s.direction,
+    stopUID: s.stopUID,
+    stopName: s.stopName,
+  }));
+
+  try {
+    const results = await apiFetch('/api/batch_eta', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+
+    results.forEach((r, i) => {
+      const el = document.getElementById(`eta-${i}`);
+      if (!el) return;
+      const f = formatEta(r);
+      const f2 = formatEta2(r);
+      el.innerHTML = `<div class="dash-eta-text ${f.cls}">${f.text}</div>` +
+        (f2 ? `<div class="dash-eta-sub eta-second">${f2}</div>` :
+         f.sub ? `<div class="dash-eta-sub">${f.sub}</div>` : '');
+    });
+
+    document.getElementById('statusText').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+  } catch(e) {
+    document.getElementById('statusText').textContent = `Error: ${e.message}`;
+  }
+}
+
+function formatEta(r) {
+  if (!r || r.StopStatus === -1) return { text: '--', cls: 'eta-c-dim', sub: '' };
+  const st = r.StopStatus;
+  if (st === 2) return { text: '\u904e\u7ad9\u4e0d\u505c', cls: 'eta-c-gray', sub: 'Bypass' };
+  if (st === 3) return { text: '\u672b\u73ed\u5df2\u904e', cls: 'eta-c-gray', sub: 'Last Passed' };
+  if (st === 4) return { text: '\u4eca\u65e5\u672a\u71df\u904b', cls: 'eta-c-gray', sub: 'No Service' };
+  if (st === 1) {
+    if (r.EstimateTime != null && r.EstimateTime > 0) {
+      const min = Math.ceil(r.EstimateTime / 60);
+      return { text: `~${min} min`, cls: 'eta-c-dim', sub: 'Not departed' };
+    }
+    return { text: '\u5c1a\u672a\u767c\u8eca', cls: 'eta-c-dim', sub: 'Not Departed' };
+  }
+  // Normal
+  if (r.EstimateTime == null) return { text: '--', cls: 'eta-c-dim', sub: '' };
+  const sec = r.EstimateTime;
+  if (sec <= 60) return { text: '\u5373\u5c07\u9032\u7ad9', cls: 'eta-c-arriving pulse', sub: 'Arriving' };
+  if (sec <= 180) return { text: `${Math.ceil(sec/60)} min`, cls: 'eta-c-soon', sub: '' };
+  return { text: `${Math.ceil(sec/60)} min`, cls: 'eta-c-normal', sub: '' };
+}
+
+function formatEta2(r) {
+  // Return formatted string for 2nd bus, or null if unavailable
+  if (!r || r.EstimateTime2 == null) return null;
+  const sec2 = r.EstimateTime2;
+  if (sec2 <= 60) return '2nd: arriving';
+  return `2nd: ~${Math.ceil(sec2 / 60)} min`;
+}
+
+// ===== Auto-refresh =====
+function startRefresh() {
+  stopRefresh();
+  const interval = appData.refreshInterval || 15000;
+  if (interval > 0) {
+    refreshTimer = setInterval(fetchGroupEta, interval);
+    document.getElementById('statusRight').textContent = `Auto: ${interval/1000}s`;
+  } else {
+    document.getElementById('statusRight').textContent = 'Manual';
+  }
+}
+
+function stopRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+}
+
+function restartRefresh() {
+  stopRefresh();
+  startRefresh();
+  fetchGroupEta();
+}
+
+// ===== Search =====
+function openSearch() {
+  document.getElementById('searchOverlay').classList.add('show');
+  renderCityChips();
+  setTimeout(() => document.getElementById('searchInput').focus(), 100);
+}
+
+function closeSearch() {
+  document.getElementById('searchOverlay').classList.remove('show');
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchContent').innerHTML = '<div class="dash-empty"><p>Type a route number to search</p></div>';
+}
+
+function renderCityChips() {
+  const container = document.getElementById('cityChips');
+  const cities = allCities.length > 0 ? allCities : [
+    {City:'Taipei',CityNameZH:'\u81fa\u5317\u5e02'},{City:'NewTaipei',CityNameZH:'\u65b0\u5317\u5e02'}
+  ];
+  container.innerHTML = cities.slice(0, 8).map(c => {
+    const active = selectedCities.includes(c.City) ? 'active' : '';
+    return `<div class="city-chip ${active}" onclick="toggleCity('${c.City}')">${c.CityNameZH}</div>`;
+  }).join('') + `<div class="city-chip" onclick="showAllCities()" style="color:var(--blue)">More...</div>`;
+}
+
+function toggleCity(city) {
+  const idx = selectedCities.indexOf(city);
+  if (idx >= 0) selectedCities.splice(idx, 1);
+  else selectedCities.push(city);
+  if (selectedCities.length === 0) selectedCities.push('Taipei');
+  renderCityChips();
+  // Re-trigger search if there's a query
+  const q = document.getElementById('searchInput').value.trim();
+  if (q) doSearch(q);
+}
+
+function showAllCities() {
+  const container = document.getElementById('cityChips');
+  const cities = allCities.length > 0 ? allCities : [];
+  container.innerHTML = cities.map(c => {
+    const active = selectedCities.includes(c.City) ? 'active' : '';
+    return `<div class="city-chip ${active}" onclick="toggleCity('${c.City}')">${c.CityNameZH}</div>`;
+  }).join('');
+}
+
+function onSearchInput() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (searchTimer) clearTimeout(searchTimer);
+  if (!q) {
+    document.getElementById('searchContent').innerHTML = '<div class="dash-empty"><p>Type a route number to search</p></div>';
+    return;
+  }
+  searchTimer = setTimeout(() => doSearch(q), 300);
+}
+
+async function doSearch(q) {
+  const content = document.getElementById('searchContent');
+  content.innerHTML = '<div class="search-loading"><span class="spinner">Searching</span></div>';
+
+  try {
+    const cities = selectedCities.join(',');
+    const results = await apiFetch(`/api/search?q=${encodeURIComponent(q)}&cities=${cities}`);
+
+    if (results.length === 0) {
+      content.innerHTML = '<div class="dash-empty"><p>No routes found</p></div>';
+      return;
+    }
+
+    let html = '';
+    for (const group of results) {
+      html += `<div class="search-city-header">${esc(group.CityNameZH)}</div>`;
+      for (const r of group.Routes) {
+        html += `<div class="search-route-item" onclick="openRoute('${esc(group.City)}','${esc(r.RouteName)}','${esc(r.Departure)}','${esc(r.Destination)}')">
+          <span class="search-route-name">${esc(r.RouteName)}</span>
+          <span class="search-route-dest">${esc(r.Departure)} - ${esc(r.Destination)}</span>
+        </div>`;
+      }
+    }
+    content.innerHTML = html;
+  } catch(e) {
+    content.innerHTML = `<div class="dash-empty"><p style="color:var(--red)">Error: ${e.message}</p></div>`;
+  }
+}
+
+// ===== Route detail =====
+async function openRoute(city, name, departure, destination) {
+  routeDetailCity = city;
+  routeDetailName = name;
+  routeDetailDeparture = departure;
+  routeDetailDestination = destination;
+  routeDetailDir = 0;
+
+  document.getElementById('routeDetailName').textContent = name;
+  document.getElementById('routeDetailEndpoints').textContent = `${departure} - ${destination}`;
+  document.getElementById('routeOverlay').classList.add('show');
+  document.getElementById('routeStops').innerHTML = '<div class="search-loading"><span class="spinner">Loading</span></div>';
+
+  try {
+    const data = await apiFetch(`/api/route/${city}/${encodeURIComponent(name)}/stops`);
+    routeDetailStops = data;
+    renderRouteDirTabs();
+    renderRouteStops();
+  } catch(e) {
+    document.getElementById('routeStops').innerHTML = `<div class="dash-empty"><p style="color:var(--red)">${e.message}</p></div>`;
+  }
+}
+
+function closeRoute() {
+  document.getElementById('routeOverlay').classList.remove('show');
+}
+
+function renderRouteDirTabs() {
+  const tabs = document.getElementById('routeDirTabs');
+  if (routeDetailStops.length <= 1) { tabs.innerHTML = ''; return; }
+
+  tabs.innerHTML = routeDetailStops.map((d, i) => {
+    const lastStop = d.Stops.length > 0 ? d.Stops[d.Stops.length - 1].StopName : '';
+    const label = '\u5f80' + lastStop;
+    const cls = i === routeDetailDir ? 'active' : '';
+    return `<div class="route-dir-tab ${cls}" onclick="switchRouteDir(${i})">${label}</div>`;
+  }).join('');
+}
+
+function switchRouteDir(idx) {
+  routeDetailDir = idx;
+  renderRouteDirTabs();
+  renderRouteStops();
+}
+
+function renderRouteStops() {
+  const container = document.getElementById('routeStops');
+  const dirData = routeDetailStops[routeDetailDir];
+  if (!dirData || dirData.Stops.length === 0) {
+    container.innerHTML = '<div class="dash-empty"><p>No stops</p></div>';
+    return;
+  }
+
+  const group = getActiveGroup();
+  const html = dirData.Stops.map(s => {
+    // Check if already added
+    const already = group && group.stops.some(gs =>
+      gs.stopUID === s.StopUID && gs.routeName === routeDetailName && gs.city === routeDetailCity && gs.direction === dirData.Direction
+    );
+    const btn = already
+      ? `<span class="added-mark">&#10003;</span>`
+      : `<button class="add-btn" onclick="addStopToGroup('${esc(s.StopUID)}','${esc(s.StopName)}',${dirData.Direction})">+</button>`;
+    return `<div class="route-stop-row"><span class="stop-name">${esc(s.StopName)}</span>${btn}</div>`;
+  }).join('');
+  container.innerHTML = html;
+}
+
+function addStopToGroup(stopUID, stopName, direction) {
+  const dirData = routeDetailStops[routeDetailDir];
+  const lastStop = dirData && dirData.Stops.length > 0 ? dirData.Stops[dirData.Stops.length - 1].StopName : '';
+  const dirLabel = '\u5f80' + lastStop;
+
+  const stopObj = {
+    city: routeDetailCity,
+    routeName: routeDetailName,
+    direction: direction,
+    stopUID: stopUID,
+    stopName: stopName,
+    dirLabel: dirLabel,
+  };
+
+  if (appData.groups.length > 1) {
+    // Show group picker
+    pendingStop = stopObj;
+    showGroupPicker();
+  } else {
+    // Add directly to active group
+    const group = getActiveGroup();
+    // Avoid duplicate
+    if (!group.stops.some(s => s.stopUID === stopUID && s.routeName === routeDetailName && s.direction === direction)) {
+      group.stops.push(stopObj);
+      saveData();
+    }
+    renderRouteStops();
+  }
+}
+
+// ===== Group picker =====
+function showGroupPicker() {
+  const list = document.getElementById('groupPickerList');
+  list.innerHTML = appData.groups.map(g =>
+    `<div class="popup-item" onclick="pickGroup('${g.id}')">${esc(g.name)}</div>`
+  ).join('');
+  document.getElementById('groupPickerBg').classList.add('show');
+}
+
+function closeGroupPicker() {
+  document.getElementById('groupPickerBg').classList.remove('show');
+  pendingStop = null;
+}
+
+function pickGroup(gid) {
+  if (!pendingStop) { closeGroupPicker(); return; }
+  const group = appData.groups.find(g => g.id === gid);
+  if (group) {
+    if (!group.stops.some(s => s.stopUID === pendingStop.stopUID && s.routeName === pendingStop.routeName && s.direction === pendingStop.direction)) {
+      group.stops.push(pendingStop);
+      saveData();
+    }
+  }
+  closeGroupPicker();
+  renderRouteStops();
+}
+
+// ===== Settings =====
+function openSettings() {
+  document.getElementById('refreshSelect').value = String(appData.refreshInterval || 15000);
+  renderSettingsGroups();
+  document.getElementById('settingsBg').classList.add('show');
+}
+
+function closeSettings() {
+  document.getElementById('settingsBg').classList.remove('show');
+  renderGroupBar();
+  renderDashboard();
+  restartRefresh();
+}
+
+function saveRefreshSetting() {
+  appData.refreshInterval = parseInt(document.getElementById('refreshSelect').value) || 0;
+  saveData();
+}
+
+function renderSettingsGroups() {
+  const container = document.getElementById('settingsGroupList');
+  container.innerHTML = appData.groups.map((g, i) => `
+    <div class="group-manage-item">
+      <input value="${esc(g.name)}" onchange="renameGroup(${i}, this.value)">
+      ${appData.groups.length > 1 ? `<button onclick="deleteGroup(${i})">&#10005;</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function renameGroup(idx, name) {
+  if (!name.trim()) return;
+  appData.groups[idx].name = name.trim();
+  saveData();
+}
+
+function deleteGroup(idx) {
+  if (appData.groups.length <= 1) return;
+  const removed = appData.groups.splice(idx, 1)[0];
+  if (appData.activeGroupId === removed.id) {
+    appData.activeGroupId = appData.groups[0].id;
+  }
+  saveData();
+  renderSettingsGroups();
+}
+
+function addGroupFromSettings() {
+  const name = prompt('Group name:');
+  if (!name || !name.trim()) return;
+  const id = 'g' + Date.now();
+  appData.groups.push({ id, name: name.trim(), stops: [] });
+  saveData();
+  renderSettingsGroups();
+}
+
+// ===== Helpers =====
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>
